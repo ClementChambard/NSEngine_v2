@@ -6,10 +6,13 @@ NSMK_PATH="$(dirname -- "${BASH_SOURCE[0]}")"
 # executable is in $NSENGINE_DEV_PATH/tools
 NSENGINE_DEV_PATH="$(dirname -- $NSMK_PATH)"
 
+NSENGINE_BUILD_DIR=".build"
+NSENGINE_BUILD_PATH="$NSENGINE_DEV_PATH/$NSENGINE_BUILD_DIR"
+
 cd $NSENGINE_DEV_PATH
 
 main() {
-  cd build > /dev/null 2> /dev/null
+  cd $NSENGINE_BUILD_DIR > /dev/null 2> /dev/null
   if [ $? -ne 0 ]; then
     echo -e "\e[31mNOT CONFIGURED\e[0m"
     exit 1
@@ -44,13 +47,13 @@ if [ $# -eq 0 ]; then
 elif [ $# -eq 1 ]; then
 
   if [ "$1" = "configure" ]; then
-    mkdir -p build && cd build && cmake -GNinja ..
+    mkdir -p $NSENGINE_BUILD_DIR && cd $NSENGINE_BUILD_DIR && cmake -GNinja ..
     exit $?
   elif [ "$1" = "log" ]; then
-    cat build/console.log
+    cat $NSENGINE_BUILD_DIR/console.log
     exit $?
   elif [ "$1" = "vimlog" ]; then
-    nvim build/console.log
+    nvim $NSENGINE_BUILD_DIR/console.log
     exit $?
   elif [ "$1" = "vim" ]; then
     nvim
@@ -60,19 +63,19 @@ elif [ $# -eq 1 ]; then
     exit $?
   elif [ "$1" = "run" ]; then
     main
-    cd build
+    cd $NSENGINE_BUILD_DIR
     testbed/testbed
     exit $?
   elif [ "$1" = "test" ]; then
     main
-    cd build
+    cd $NSENGINE_BUILD_DIR
     tests/tests
     exit $?
   elif [ "$1" = "cleanall" ]; then
-    rm -rf build
+    rm -rf $NSENGINE_BUILD_DIR
     exit $?
   elif [ "$1" = "clean" ]; then
-    cd build > /dev/null 2> /dev/null && ninja clean && rm -rf assets
+    cd $NSENGINE_BUILD_DIR > /dev/null 2> /dev/null && ninja clean && rm -rf assets
     exit $?
   fi
 

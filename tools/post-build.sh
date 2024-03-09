@@ -1,9 +1,9 @@
 #!/bin/bash
 
-mkdir -p build/assets/
+mkdir -p .build/assets/
 
 SHADER_INPUT_PATH="assets/shaders"
-SHADER_OUTPUT_PATH="build/assets/shaders"
+SHADER_OUTPUT_PATH=".build/assets/shaders"
 
 compile_shader_sub() {
   NAME=$1
@@ -38,5 +38,5 @@ compile_shader "Builtin" "MaterialShader"
 
 # copy assets
 echo "Copying assets..."
-echo "cp -R \"assets\" \"build\""
-cp -R "assets" "build"
+echo "cp -R \"assets\" \".build\""
+cp -R "assets" ".build"
