@@ -6,6 +6,11 @@ NSEngine is a game engine written in C++ with Vulkan support.
 Code greatly inspired by **Kohi game engine** by [TravisVroman](https://www.youtube.com/@TravisVroman) (currently following the series)
 This is WIP and has not replace the v1 yet ([NSEngine v1](https://github.com/ClementChambard/NSEngine))
 
+## requirement
+
+- [Vulkan SDK](https://vulkan.lunarg.com/sdk/home/)
+- [CMake](https://cmake.org/)
+
 ## nsmk
 
 use tools/nsmk to build and run
