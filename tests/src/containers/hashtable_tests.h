@@ -1,0 +1,6 @@
+#ifndef HASHTABLE_TESTS_HEADER_INCLUDED
+#define HASHTABLE_TESTS_HEADER_INCLUDED
+
+void hashtable_register_tests();
+
+#endif // HASHTABLE_TESTS_HEADER_INCLUDED
