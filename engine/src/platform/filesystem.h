@@ -53,10 +53,13 @@ NS_API void close(File *handle);
 /**
  * Reads a line from a file
  * @param handle The handle of the file
+ * @param max_length The maximum length of the line
  * @param line_buf The buffer to store the line in
+ * @param out_line_length The length of the line
  * @returns True if the line was read successfully
  */
-NS_API bool read_line(File *handle, str *line_buf);
+NS_API bool read_line(File *handle, usize max_length, str *line_buf,
+                      u64 *out_line_length);
 
 /**
  * Writes a line to a file

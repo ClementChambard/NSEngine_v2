@@ -6,14 +6,20 @@
 #include "./input.h"
 #include "./logger.h"
 #include "./ns_memory.h"
+#include "./ns_string.h"
 
 #include "../memory/linear_allocator.h"
 
 #include "../renderer/renderer_frontend.h"
 
+#include "../systems/geometry_system.h"
+#include "../systems/material_system.h"
 #include "../systems/texture_system.h"
 
 #include <new>
+
+// temp
+#include "../math/ns_math.h"
 
 struct application_state {
   game *game_inst;
@@ -45,6 +51,15 @@ struct application_state {
 
   u64 texture_system_memory_requirement;
   ptr texture_system_state;
+
+  u64 material_system_memory_requirement;
+  ptr material_system_state;
+
+  u64 geometry_system_memory_requirement;
+  ptr geometry_system_state;
+
+  // temp
+  ns::Geometry *test_geometry;
 };
 
 static application_state *app_state;
@@ -53,6 +68,40 @@ bool application_on_event(u16 code, ptr sender, ptr listener_inst,
                           event_context context);
 bool application_on_resized(u16 code, ptr sender, ptr listener_inst,
                             event_context context);
+
+// temp
+bool application_on_debug_event(u16, ptr, ptr, event_context) {
+  cstr names[3] = {
+      "Brick_01",
+      "Brick_02",
+      "Brick_03",
+  };
+  static i8 choice = 2;
+
+  cstr old_name = names[choice];
+
+  choice++;
+  choice %= 3;
+
+  static bool first = true;
+
+  if (app_state->test_geometry) {
+    app_state->test_geometry->material->diffuse_map.texture =
+        ns::texture_system_acquire(names[choice], true);
+    if (!app_state->test_geometry->material->diffuse_map.texture) {
+      NS_WARN("Unable to load texture '%s' for test geometry, using default.",
+              names[choice]);
+      app_state->test_geometry->material->diffuse_map.texture =
+          ns::texture_system_get_default_texture();
+    }
+    if (!first) {
+      ns::texture_system_release(old_name);
+    }
+    first = false;
+  }
+
+  return true;
+}
 
 bool application_create(game *game_inst) {
   if (game_inst->application_state) {
@@ -106,6 +155,8 @@ bool application_create(game *game_inst) {
 
   event_register(EVENT_CODE_APPLICATION_QUIT, nullptr, application_on_event);
   event_register(EVENT_CODE_RESIZED, nullptr, application_on_resized);
+  // temp
+  event_register(EVENT_CODE_DEBUG0, nullptr, application_on_debug_event);
 
   platform_system_startup(&app_state->platform_system_memory_requirement,
                           nullptr, nullptr, 0, 0, 0, 0);
@@ -141,6 +192,41 @@ bool application_create(game *game_inst) {
     NS_FATAL("Failed to initialize texture system. Aborting application.");
     return false;
   }
+
+  ns::material_system_config material_sys_cfg{4096};
+  ns::material_system_initialize(&app_state->material_system_memory_requirement,
+                                 nullptr, material_sys_cfg);
+  app_state->material_system_state = app_state->systems_allocator.allocate(
+      app_state->material_system_memory_requirement);
+  if (!ns::material_system_initialize(
+          &app_state->material_system_memory_requirement,
+          app_state->material_system_state, material_sys_cfg)) {
+    NS_FATAL("Failed to initialize material system. Aborting application.");
+    return false;
+  }
+
+  ns::geometry_system_config geometry_sys_cfg{4096};
+  ns::geometry_system_initialize(&app_state->geometry_system_memory_requirement,
+                                 nullptr, geometry_sys_cfg);
+  app_state->geometry_system_state = app_state->systems_allocator.allocate(
+      app_state->geometry_system_memory_requirement);
+  if (!ns::geometry_system_initialize(
+          &app_state->geometry_system_memory_requirement,
+          app_state->geometry_system_state, geometry_sys_cfg)) {
+    NS_FATAL("Failed to initialize geometry system. Aborting application.");
+    return false;
+  }
+
+  // temp
+  // app_state->test_geometry = ns::geometry_system_get_default();
+  ns::geometry_config config = ns::geometry_config::plane(
+      10.0f, 10.0f, 5, 5, 2.0f, 2.0f, "test geometry", "test_material");
+  app_state->test_geometry = ns::geometry_system_acquire(config, true);
+
+  ns::free(config.vertices, sizeof(ns::vertex_3d) * config.vertex_count,
+           ns::mem_tag::ARRAY);
+  ns::free(config.indices, sizeof(u32) * config.index_count,
+           ns::mem_tag::ARRAY);
 
   if (!app_state->game_inst->initialize(app_state->game_inst)) {
     NS_FATAL("Game failed to initialize.");
@@ -192,6 +278,13 @@ bool application_run() {
     // TODO(ClementChambard): refactor packet creation
     ns::render_packet packet;
     packet.delta_time = delta;
+
+    ns::geometry_render_data test_render;
+    test_render.geometry = app_state->test_geometry;
+    test_render.model = ns::mat4(1.0f);
+    packet.geometry_count = 1;
+    packet.geometries = &test_render;
+
     renderer_draw_frame(&packet);
 
     f64 frame_end_time = platform_get_absolute_time();
@@ -215,10 +308,16 @@ bool application_run() {
     app_state->last_time = current_time;
   }
 
+  // temp
+  event_unregister(EVENT_CODE_DEBUG0, nullptr, application_on_debug_event);
   event_unregister(EVENT_CODE_APPLICATION_QUIT, nullptr, application_on_event);
   event_unregister(EVENT_CODE_RESIZED, nullptr, application_on_resized);
 
   ns::InputManager::cleanup(app_state->input_system_state);
+
+  ns::geometry_system_shutdown(app_state->geometry_system_state);
+
+  ns::material_system_shutdown(app_state->material_system_state);
 
   ns::texture_system_shutdown(app_state->texture_system_state);
 

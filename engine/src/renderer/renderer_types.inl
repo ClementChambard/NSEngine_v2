@@ -20,17 +20,19 @@ struct global_uniform_object {
   mat4 m_reserved1;
 };
 
-struct object_uniform_object {
+struct material_uniform_object {
   vec4 diffuse_color;
   vec4 v_reserved0;
   vec4 v_reserved1;
   vec4 v_reserved2;
+  mat4 m_reserved3;
+  mat4 m_reserved4;
+  mat4 m_reserved5;
 };
 
 struct geometry_render_data {
-  u32 object_id;
   mat4 model;
-  Texture *textures[16];
+  Geometry *geometry;
 };
 
 struct renderer_backend {
@@ -47,16 +49,24 @@ struct renderer_backend {
                               vec4 ambient_color, i32 mode);
   bool (*end_frame)(renderer_backend *backend, f32 delta_time);
 
-  void (*update_object)(geometry_render_data data);
+  void (*draw_geometry)(geometry_render_data data);
 
-  void (*create_texture)(cstr name, i32 width, i32 height, i32 channel_count,
-                         robytes pixels, bool has_transparency,
-                         Texture *out_texture);
+  void (*create_texture)(robytes pixels, Texture *texture);
   void (*destroy_texture)(Texture *texture);
+
+  bool (*create_material)(Material *material);
+  void (*destroy_material)(Material *material);
+
+  bool (*create_geometry)(Geometry *geometry, u32 vertex_count,
+                          vertex_3d const *vertices, u32 index_count,
+                          u32 const *indices);
+  void (*destroy_geometry)(Geometry *geometry);
 };
 
 struct render_packet {
   f32 delta_time;
+  u32 geometry_count;
+  geometry_render_data *geometries;
 };
 
 } // namespace ns

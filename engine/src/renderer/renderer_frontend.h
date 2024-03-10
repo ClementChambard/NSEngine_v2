@@ -5,7 +5,6 @@
 
 namespace ns {
 
-struct static_mesh_data;
 struct platform_state;
 
 bool renderer_system_initialize(u64 *memory_requirement, ptr state,
@@ -19,11 +18,19 @@ bool renderer_draw_frame(render_packet *packet);
 // HACK: remove NS_API when possible
 NS_API void renderer_set_view(mat4 view);
 
-void renderer_create_texture(cstr name, i32 width, i32 height,
-                             i32 channel_count, robytes pixels,
-                             bool has_transparency, Texture *out_texture);
+void renderer_create_texture(robytes pixels, Texture *texture);
 
 void renderer_destroy_texture(Texture *texture);
+
+bool renderer_create_material(Material *material);
+
+void renderer_destroy_material(Material *material);
+
+bool renderer_create_geometry(Geometry *geometry, u32 vertex_count,
+                              vertex_3d const *vertices, u32 index_count,
+                              u32 const *indices);
+
+void renderer_destroy_geometry(Geometry *geometry);
 
 } // namespace ns
 

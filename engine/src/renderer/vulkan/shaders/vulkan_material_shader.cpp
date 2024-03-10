@@ -14,12 +14,11 @@
 namespace ns::vulkan {
 
 bool material_shader_create(Context *context, MaterialShader *out_shader) {
-  char stage_type_strs[MaterialShader::SHADER_STAGE_COUNT][5] = {"vert",
-                                                                 "frag"};
-  VkShaderStageFlagBits stage_types[MaterialShader::SHADER_STAGE_COUNT] = {
+  char stage_type_strs[MaterialShader::STAGE_COUNT][5] = {"vert", "frag"};
+  VkShaderStageFlagBits stage_types[MaterialShader::STAGE_COUNT] = {
       VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
 
-  for (usize i = 0; i < MaterialShader::SHADER_STAGE_COUNT; i++) {
+  for (usize i = 0; i < MaterialShader::STAGE_COUNT; i++) {
     if (!create_shader_module(context, BUILTIN_SHADER_NAME_MATERIAL,
                               stage_type_strs[i], stage_types[i], i,
                               out_shader->stages)) {
@@ -59,27 +58,27 @@ bool material_shader_create(Context *context, MaterialShader *out_shader) {
                                   &global_pool_info, context->allocator,
                                   &out_shader->global_descriptor_pool));
 
-  const u32 local_sampler_count = 1;
-  VkDescriptorSetLayoutBinding
-      bindings[MaterialShader::SHADER_DESCRIPTOR_COUNT] = {
-          {
-              .binding = 0,
-              .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-              .descriptorCount = 1,
-              .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-              .pImmutableSamplers = nullptr,
-          },
-          {
-              .binding = 1,
-              .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-              .descriptorCount = 1,
-              .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-              .pImmutableSamplers = nullptr,
-          }};
+  out_shader->sampler_uses[0] = TextureUse::MAP_DIFFUSE;
+
+  VkDescriptorSetLayoutBinding bindings[MaterialShader::DESCRIPTOR_COUNT] = {
+      {
+          .binding = 0,
+          .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+          .descriptorCount = 1,
+          .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+          .pImmutableSamplers = nullptr,
+      },
+      {
+          .binding = 1,
+          .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+          .descriptorCount = 1,
+          .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+          .pImmutableSamplers = nullptr,
+      }};
 
   VkDescriptorSetLayoutCreateInfo layout_info{};
   layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  layout_info.bindingCount = MaterialShader::SHADER_DESCRIPTOR_COUNT;
+  layout_info.bindingCount = MaterialShader::DESCRIPTOR_COUNT;
   layout_info.pBindings = bindings;
 
   VK_CHECK(vkCreateDescriptorSetLayout(
@@ -88,16 +87,17 @@ bool material_shader_create(Context *context, MaterialShader *out_shader) {
 
   VkDescriptorPoolSize object_pool_sizes[2];
   object_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  object_pool_sizes[0].descriptorCount = MaterialShader::MAX_OBJECT_COUNT;
+  object_pool_sizes[0].descriptorCount = MaterialShader::MAX_MATERIAL_COUNT;
   object_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
   object_pool_sizes[1].descriptorCount =
-      local_sampler_count * MaterialShader::MAX_OBJECT_COUNT;
+      MaterialShader::STAGE_COUNT * MaterialShader::MAX_MATERIAL_COUNT;
 
   VkDescriptorPoolCreateInfo object_pool_info{};
   object_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   object_pool_info.poolSizeCount = 2;
   object_pool_info.pPoolSizes = object_pool_sizes;
-  object_pool_info.maxSets = MaterialShader::MAX_OBJECT_COUNT;
+  object_pool_info.maxSets = MaterialShader::MAX_MATERIAL_COUNT;
+  object_pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
   VK_CHECK(vkCreateDescriptorPool(context->device.logical_device,
                                   &object_pool_info, context->allocator,
                                   &out_shader->object_descriptor_pool));
@@ -142,9 +142,9 @@ bool material_shader_create(Context *context, MaterialShader *out_shader) {
   };
 
   VkPipelineShaderStageCreateInfo
-      stage_create_infos[MaterialShader::SHADER_STAGE_COUNT];
+      stage_create_infos[MaterialShader::STAGE_COUNT];
   mem_zero(stage_create_infos, sizeof(stage_create_infos));
-  for (usize i = 0; i < MaterialShader::SHADER_STAGE_COUNT; i++) {
+  for (usize i = 0; i < MaterialShader::STAGE_COUNT; i++) {
     stage_create_infos[i].sType =
         out_shader->stages[i].shader_stage_create_info.sType;
     stage_create_infos[i] = out_shader->stages[i].shader_stage_create_info;
@@ -152,9 +152,9 @@ bool material_shader_create(Context *context, MaterialShader *out_shader) {
 
   if (!graphics_pipeline_create(
           context, &context->main_renderpass, attribute_count, attribute_descs,
-          descriptor_set_layout_count, layouts,
-          MaterialShader::SHADER_STAGE_COUNT, stage_create_infos, viewport,
-          scissor, false, &out_shader->pipeline)) {
+          descriptor_set_layout_count, layouts, MaterialShader::STAGE_COUNT,
+          stage_create_infos, viewport, scissor, false,
+          &out_shader->pipeline)) {
     NS_ERROR("Failed to load graphics pipeline for object shader.");
     return false;
   }
@@ -186,7 +186,9 @@ bool material_shader_create(Context *context, MaterialShader *out_shader) {
   VK_CHECK(vkAllocateDescriptorSets(context->device.logical_device, &alloc_info,
                                     out_shader->global_descriptor_sets));
 
-  if (!buffer_create(context, sizeof(object_uniform_object),
+  if (!buffer_create(context,
+                     sizeof(material_uniform_object) *
+                         MaterialShader::MAX_MATERIAL_COUNT,
                      static_cast<VkBufferUsageFlagBits>(
                          VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
@@ -221,7 +223,7 @@ void material_shader_destroy(Context *context, MaterialShader *shader) {
                                shader->object_descriptor_set_layout,
                                context->allocator);
 
-  for (usize i = 0; i < MaterialShader::SHADER_STAGE_COUNT; i++) {
+  for (usize i = 0; i < MaterialShader::STAGE_COUNT; i++) {
     vkDestroyShaderModule(context->device, shader->stages[i].handle,
                           context->allocator);
     shader->stages[i].handle = VK_NULL_HANDLE;
@@ -269,39 +271,47 @@ void material_shader_update_global_state(Context *context,
                           nullptr);
 }
 
-void material_shader_update_object(Context *context, MaterialShader *shader,
-                                   geometry_render_data data) {
-  u32 image_index = context->image_index;
-  vkCmdPushConstants(context->graphics_command_buffers[image_index],
-                     shader->pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                     sizeof(mat4), &data.model);
+void material_shader_set_model(Context *context, MaterialShader *shader,
+                               mat4 model) {
+  if (context && shader) {
+    vkCmdPushConstants(context->graphics_command_buffers[context->image_index],
+                       shader->pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                       sizeof(mat4), &model);
+  }
+}
 
-  MaterialShader::ObjectState *object_state =
-      &shader->object_states[data.object_id];
+void material_shader_apply_material(Context *context, MaterialShader *shader,
+                                    Material *material) {
+  if (!context || !shader || !material) {
+    return;
+  }
+  u32 image_index = context->image_index;
+
+  MaterialShader::InstanceState *object_state =
+      &shader->instance_states[material->internal_id];
   VkDescriptorSet object_descriptor =
       object_state->descriptor_sets[image_index];
 
-  VkWriteDescriptorSet
-      descriptor_writes[MaterialShader::SHADER_DESCRIPTOR_COUNT];
-  mem_zero(descriptor_writes, sizeof(VkWriteDescriptorSet) *
-                                  MaterialShader::SHADER_DESCRIPTOR_COUNT);
+  VkWriteDescriptorSet descriptor_writes[MaterialShader::DESCRIPTOR_COUNT];
+  mem_zero(descriptor_writes,
+           sizeof(VkWriteDescriptorSet) * MaterialShader::DESCRIPTOR_COUNT);
   u32 descriptor_count = 0;
   u32 descriptor_index = 0;
 
-  u32 range = sizeof(object_uniform_object);
-  u32 offset = sizeof(object_uniform_object) * data.object_id;
-  object_uniform_object obo;
+  u32 range = sizeof(material_uniform_object);
+  u32 offset = sizeof(material_uniform_object) * material->internal_id;
+  material_uniform_object obo;
 
-  static f32 accumulator = 0.0f;
-  accumulator += context->frame_delta_time;
-  f32 s = (sin(accumulator) + 1.0f) / 2.0f;
-  obo.diffuse_color = vec4(s, s, s, 1.0f);
+  obo.diffuse_color = material->diffuse_color;
 
   buffer_load_data(context, &shader->object_uniform_buffer, offset, range, 0,
                    &obo);
 
-  if (object_state->descriptor_states[descriptor_index]
-          .generations[image_index] == INVALID_ID) {
+  u32 *global_ubo_generation =
+      &object_state->descriptor_states[descriptor_index]
+           .generations[image_index];
+  if (*global_ubo_generation == INVALID_ID ||
+      *global_ubo_generation != material->generation) {
     VkDescriptorBufferInfo buffer_info;
     buffer_info.buffer = shader->object_uniform_buffer;
     buffer_info.offset = offset;
@@ -317,16 +327,25 @@ void material_shader_update_object(Context *context, MaterialShader *shader,
 
     descriptor_writes[descriptor_count++] = descriptor;
 
-    object_state->descriptor_states[descriptor_index].generations[image_index] =
-        1;
+    *global_ubo_generation = material->generation;
   }
   descriptor_index++;
 
-  const u32 sampler_count = 1;
+  VkDescriptorImageInfo image_infos[MaterialShader::SAMPLER_COUNT];
+  for (u32 i = 0; i < MaterialShader::SAMPLER_COUNT; i++) {
+    TextureUse use = shader->sampler_uses[i];
+    Texture *t = nullptr;
 
-  VkDescriptorImageInfo image_infos[sampler_count];
-  for (u32 i = 0; i < sampler_count; i++) {
-    Texture *t = data.textures[i];
+    switch (use) {
+    case TextureUse::MAP_DIFFUSE: {
+      t = material->diffuse_map.texture;
+      break;
+    }
+    default:
+      NS_FATAL("Unable to bind sampler to unknown use.");
+      return;
+    }
+
     u32 *descriptor_generation =
         &object_state->descriptor_states[descriptor_index]
              .generations[image_index];
@@ -378,13 +397,13 @@ void material_shader_update_object(Context *context, MaterialShader *shader,
 }
 
 bool material_shader_acquire_resources(Context *context, MaterialShader *shader,
-                                       u32 *out_object_id) {
-  *out_object_id = shader->object_uniform_buffer_index;
+                                       Material *material) {
+  material->internal_id = shader->object_uniform_buffer_index;
   shader->object_uniform_buffer_index++;
 
-  u32 object_id = *out_object_id;
-  MaterialShader::ObjectState *object_state = &shader->object_states[object_id];
-  for (u32 i = 0; i < MaterialShader::SHADER_DESCRIPTOR_COUNT; i++) {
+  MaterialShader::InstanceState *object_state =
+      &shader->instance_states[material->internal_id];
+  for (u32 i = 0; i < MaterialShader::DESCRIPTOR_COUNT; i++) {
     for (u32 j = 0; j < 3; j++) {
       object_state->descriptor_states[i].generations[j] = INVALID_ID;
       object_state->descriptor_states[i].ids[j] = INVALID_ID;
@@ -413,8 +432,11 @@ bool material_shader_acquire_resources(Context *context, MaterialShader *shader,
 }
 
 void material_shader_release_resources(Context *context, MaterialShader *shader,
-                                       u32 object_id) {
-  MaterialShader::ObjectState *object_state = &shader->object_states[object_id];
+                                       Material *material) {
+  vkDeviceWaitIdle(context->device);
+
+  MaterialShader::InstanceState *object_state =
+      &shader->instance_states[material->internal_id];
 
   const u32 descriptor_set_count = 3;
   VkResult result =
@@ -425,12 +447,14 @@ void material_shader_release_resources(Context *context, MaterialShader *shader,
     NS_ERROR("Error freeing descriptor sets in shader");
   }
 
-  for (u32 i = 0; i < MaterialShader::SHADER_DESCRIPTOR_COUNT; i++) {
+  for (u32 i = 0; i < MaterialShader::DESCRIPTOR_COUNT; i++) {
     for (u32 j = 0; j < 3; j++) {
       object_state->descriptor_states[i].generations[j] = INVALID_ID;
       object_state->descriptor_states[i].ids[j] = INVALID_ID;
     }
   }
+
+  material->internal_id = INVALID_ID;
 }
 
 } // namespace ns::vulkan

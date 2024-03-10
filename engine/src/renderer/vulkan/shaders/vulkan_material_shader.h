@@ -16,14 +16,16 @@ void material_shader_update_global_state(Context *context,
                                          MaterialShader *shader,
                                          f32 delta_time);
 
-void material_shader_update_object(Context *context, MaterialShader *shader,
-                                   geometry_render_data data);
+void material_shader_set_model(Context *context, MaterialShader *shader,
+                               mat4 model);
+void material_shader_apply_material(Context *context, MaterialShader *shader,
+                                    Material *material);
 
 bool material_shader_acquire_resources(Context *context, MaterialShader *shader,
-                                       u32 *out_object_id);
+                                       Material *material);
 
 void material_shader_release_resources(Context *context, MaterialShader *shader,
-                                       u32 object_id);
+                                       Material *material);
 
 } // namespace ns::vulkan
 

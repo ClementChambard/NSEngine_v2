@@ -14,8 +14,13 @@ namespace ns::fs {
 #define FILE_MODE_WRITE static_cast<int>(Mode::WRITE)
 
 bool exists(cstr path) {
+#ifdef _MSC_VER
+  struct _stat buffer;
+  return _stat(path, &buffer);
+#else
   struct stat buffer;
   return stat(path, &buffer) == 0;
+#endif
 }
 
 bool open(cstr path, Mode mode, bool binary, File *out_handle) {
@@ -34,7 +39,7 @@ bool open(cstr path, Mode mode, bool binary, File *out_handle) {
     return false;
   }
 
-  FILE *file = fopen(path, mode_str);
+  FILE *file = std::fopen(path, mode_str);
   if (!file) {
     NS_ERROR("Error opening file: '%s'", path);
     return false;
@@ -48,21 +53,19 @@ bool open(cstr path, Mode mode, bool binary, File *out_handle) {
 
 void close(File *handle) {
   if (handle->handle) {
-    fclose(HANDLE(handle));
+    std::fclose(HANDLE(handle));
     handle->handle = nullptr;
     handle->is_valid = false;
   }
 }
 
-bool read_line(File *handle, str *line_buf) {
-  if (!handle->handle)
+bool read_line(File *handle, usize max_length, str *line_buf,
+               u64 *out_line_length) {
+  if (!handle->handle || !line_buf || !out_line_length || max_length == 0)
     return false;
-  char buffer[32000];
-  if (fgets(buffer, sizeof(buffer), HANDLE(handle)) != 0) {
-    usize length = strlen(buffer);
-    *line_buf = reinterpret_cast<str>(
-        alloc((sizeof(char) * length) + 1, mem_tag::STRING));
-    strcpy(*line_buf, buffer);
+  str buf = *line_buf;
+  if (std::fgets(buf, max_length, HANDLE(handle)) != nullptr) {
+    *out_line_length = std::strlen(buf);
     return true;
   }
   return false;
@@ -71,32 +74,32 @@ bool read_line(File *handle, str *line_buf) {
 bool write_line(File *handle, cstr text) {
   if (!handle->handle)
     return false;
-  i32 result = fputs(text, HANDLE(handle));
+  i32 result = std::fputs(text, HANDLE(handle));
   if (result != EOF) {
-    result = fputc('\n', HANDLE(handle));
+    result = std::fputc('\n', HANDLE(handle));
   }
 
-  fflush(HANDLE(handle));
+  std::fflush(HANDLE(handle));
   return result != EOF;
 }
 
 bool read(File *handle, usize data_size, ptr out_data, usize *out_bytes_read) {
   if (!handle->handle)
     return false;
-  *out_bytes_read = fread(out_data, 1, data_size, HANDLE(handle));
+  *out_bytes_read = std::fread(out_data, 1, data_size, HANDLE(handle));
   return *out_bytes_read == data_size;
 }
 
 bool read_all_bytes(File *handle, bytes *out_bytes, usize *out_bytes_read) {
   if (!handle->handle)
     return false;
-  fseek(HANDLE(handle), 0, SEEK_END);
-  usize size = ftell(HANDLE(handle));
-  rewind(HANDLE(handle));
+  std::fseek(HANDLE(handle), 0, SEEK_END);
+  usize size = std::ftell(HANDLE(handle));
+  std::rewind(HANDLE(handle));
 
   *out_bytes =
       reinterpret_cast<bytes>(alloc(sizeof(u8) * size, mem_tag::STRING));
-  *out_bytes_read = fread(*out_bytes, 1, size, HANDLE(handle));
+  *out_bytes_read = std::fread(*out_bytes, 1, size, HANDLE(handle));
   return *out_bytes_read == size;
 }
 
@@ -104,10 +107,10 @@ bool write(File *handle, usize data_size, roptr data,
            usize *out_bytes_written) {
   if (!handle->handle)
     return false;
-  *out_bytes_written = fwrite(data, 1, data_size, HANDLE(handle));
+  *out_bytes_written = std::fwrite(data, 1, data_size, HANDLE(handle));
   if (*out_bytes_written != data_size)
     return false;
-  fflush(HANDLE(handle));
+  std::fflush(HANDLE(handle));
   return true;
 }
 

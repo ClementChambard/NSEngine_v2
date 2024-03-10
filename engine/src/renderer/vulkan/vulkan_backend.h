@@ -5,30 +5,34 @@
 
 namespace ns::vulkan {
 
-bool renderer_backend_initialize(renderer_backend *backend,
-                                 cstr application_name);
+bool backend_initialize(renderer_backend *backend, cstr application_name);
 
-void renderer_backend_shutdown(renderer_backend *backend);
+void backend_shutdown(renderer_backend *backend);
 
-void renderer_backend_on_resized(renderer_backend *backend, u16 width,
-                                 u16 height);
+void backend_on_resized(renderer_backend *backend, u16 width, u16 height);
 
-bool renderer_backend_begin_frame(renderer_backend *backend, f32 delta_time);
+bool backend_begin_frame(renderer_backend *backend, f32 delta_time);
 
-void renderer_update_global_state(mat4 projection, mat4 view,
-                                  vec3 view_position, vec4 ambient_color,
-                                  i32 mode);
+void backend_update_global_state(mat4 projection, mat4 view, vec3 view_position,
+                                 vec4 ambient_color, i32 mode);
 
-bool renderer_backend_end_frame(renderer_backend *backend, f32 delta_time);
+bool backend_end_frame(renderer_backend *backend, f32 delta_time);
 
-// temp
-void renderer_update_object(geometry_render_data);
+void backend_draw_geometry(geometry_render_data);
 
-void renderer_create_texture(cstr name, i32 width, i32 height,
-                             i32 channel_count, robytes pixels,
-                             bool has_transparency, Texture *out_texture);
+void backend_create_texture(robytes pixels, Texture *texture);
 
-void renderer_destroy_texture(Texture *texture);
+void backend_destroy_texture(Texture *texture);
+
+bool backend_create_material(Material *material);
+
+void backend_destroy_material(Material *material);
+
+bool backend_create_geometry(Geometry *geometry, u32 vertex_count,
+                             vertex_3d const *vertices, u32 index_count,
+                             u32 const *indices);
+
+void backend_destroy_geometry(Geometry *geometry);
 
 } // namespace ns::vulkan
 

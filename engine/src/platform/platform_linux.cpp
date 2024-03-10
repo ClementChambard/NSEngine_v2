@@ -93,12 +93,13 @@ bool platform_system_startup(usize *memory_requirement, ptr state,
 
   xcb_change_property(state_ptr->connection, XCB_PROP_MODE_REPLACE,
                       state_ptr->window, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
-                      strlen(application_name), application_name);
+                      std::strlen(application_name), application_name);
 
-  xcb_intern_atom_cookie_t wm_delete_cookie = xcb_intern_atom(
-      state_ptr->connection, 0, strlen("WM_DELETE_WINDOW"), "WM_DELETE_WINDOW");
+  xcb_intern_atom_cookie_t wm_delete_cookie =
+      xcb_intern_atom(state_ptr->connection, 0, std::strlen("WM_DELETE_WINDOW"),
+                      "WM_DELETE_WINDOW");
   xcb_intern_atom_cookie_t wm_protocols_cookie = xcb_intern_atom(
-      state_ptr->connection, 0, strlen("WM_PROTOCOLS"), "WM_PROTOCOLS");
+      state_ptr->connection, 0, std::strlen("WM_PROTOCOLS"), "WM_PROTOCOLS");
   xcb_intern_atom_reply_t *wm_delete_reply =
       xcb_intern_atom_reply(state_ptr->connection, wm_delete_cookie, NULL);
   xcb_intern_atom_reply_t *wm_protocols_reply =
@@ -201,35 +202,37 @@ bool platform_pump_messages() {
       break;
     }
 
-    free(event);
+    std::free(event);
   }
   return !quit_flagged;
 }
 
-ptr platform_allocate(usize size, bool /* aligned */) { return malloc(size); }
+ptr platform_allocate(usize size, bool /* aligned */) {
+  return std::malloc(size);
+}
 
-void platform_free(ptr block, bool /* aligned */) { free(block); }
+void platform_free(ptr block, bool /* aligned */) { std::free(block); }
 
 ptr platform_zero_memory(ptr block, usize size) {
-  return memset(block, 0, size);
+  return std::memset(block, 0, size);
 }
 
 ptr platform_copy_memory(ptr dest, roptr source, usize size) {
-  return memcpy(dest, source, size);
+  return std::memcpy(dest, source, size);
 }
 
 ptr platform_set_memory(ptr dest, i32 value, usize size) {
-  return memset(dest, value, size);
+  return std::memset(dest, value, size);
 }
 
 void platform_console_write(cstr message, u8 color) {
   cstr levels[6] = {"0;41", "1;31", "1;33", "1;32", "1;34", "0;36"};
-  printf("\033[%sm%s\033[0m", levels[color], message);
+  std::printf("\033[%sm%s\033[0m", levels[color], message);
 }
 
 void platform_console_write_error(cstr message, u8 color) {
   cstr levels[6] = {"0;41", "1;31", "1;33", "1;32", "1;34", "0;36"};
-  printf("\033[%sm%s\033[0m", levels[color], message);
+  std::printf("\033[%sm%s\033[0m", levels[color], message);
 }
 
 f64 platform_get_absolute_time() {

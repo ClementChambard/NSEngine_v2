@@ -1,6 +1,7 @@
 #ifndef NS_VEC2_HEADER_INCLUDED
 #define NS_VEC2_HEADER_INCLUDED
 
+#include "../../../core/ns_string.h"
 #include "../../../defines.h"
 #include "../../ns_cstes.h"
 
@@ -117,6 +118,12 @@ struct vec2 {
   static vec2 down() { return {0.0f, -1.0f}; }
   static vec2 left() { return {-1.0f, 0.0f}; }
   static vec2 right() { return {1.0f, 0.0f}; }
+
+  bool from(cstr s) {
+    if (!s)
+      return false;
+    return string_scanf(s, "%f %f", &x, &y) != -1;
+  }
 };
 
 } // namespace ns

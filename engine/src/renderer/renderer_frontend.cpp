@@ -9,6 +9,7 @@
 
 // TODO(ClementChambard): Temp
 #include "../core/event.h"
+#include "../systems/material_system.h"
 #include "../systems/texture_system.h"
 // TODO(ClementChambard): EndTemp
 
@@ -20,37 +21,9 @@ struct renderer_system_state {
   mat4 view;
   f32 near_clip;
   f32 far_clip;
-
-  // TODO(ClementChambard): Temp
-  Texture *test_diffuse;
-  // TODO(ClementChambard): EndTemp
 };
 
 static renderer_system_state *state_ptr = nullptr;
-
-// TODO(ClementChambard): Temp
-bool event_on_debug_event(u16, ptr, ptr, event_context) {
-  cstr names[3] = {
-      "Brick_01",
-      "Brick_02",
-      "Brick_03",
-  };
-  static i8 choice = 2;
-  static bool first = true;
-
-  cstr old_name = names[choice];
-
-  choice++;
-  choice %= 3;
-
-  state_ptr->test_diffuse = texture_system_acquire(names[choice], false);
-  if (!first) {
-    texture_system_release(old_name);
-  }
-  first = false;
-  return true;
-}
-// TODO(ClementChambard): EndTemp
 
 bool renderer_system_initialize(usize *memory_requirement, ptr state,
                                 cstr application_name) {
@@ -59,11 +32,6 @@ bool renderer_system_initialize(usize *memory_requirement, ptr state,
     return true;
   }
   state_ptr = reinterpret_cast<renderer_system_state *>(state);
-
-  // TODO(ClementChambard): Temp
-  event_register(EVENT_CODE_DEBUG0, state_ptr, event_on_debug_event);
-  state_ptr->test_diffuse = nullptr;
-  // TODO(ClementChambard): EndTemp
 
   // TODO(ClementChambard): make it configurable
   renderer_backend_create(RENDERER_BACKEND_TYPE_VULKAN, &state_ptr->backend);
@@ -86,10 +54,6 @@ bool renderer_system_initialize(usize *memory_requirement, ptr state,
 }
 
 void renderer_system_shutdown(ptr /*state*/) {
-  // TODO(ClementChambard): Temp
-  event_unregister(EVENT_CODE_DEBUG0, state_ptr, event_on_debug_event);
-  // TODO(ClementChambard): EndTemp
-
   if (!state_ptr) {
     return;
   }
@@ -130,16 +94,10 @@ bool renderer_draw_frame(render_packet *packet) {
     state_ptr->backend.update_global_state(
         state_ptr->projection, state_ptr->view, vec3::zero(), vec4::one(), 0);
 
-    geometry_render_data data{};
-    data.object_id = 0;
-    data.model = mat4(1.0f);
-
-    if (!state_ptr->test_diffuse) {
-      state_ptr->test_diffuse = texture_system_get_default_texture();
+    u32 count = packet->geometry_count;
+    for (u32 i = 0; i < count; i++) {
+      state_ptr->backend.draw_geometry(packet->geometries[i]);
     }
-
-    data.textures[0] = state_ptr->test_diffuse;
-    state_ptr->backend.update_object(data);
 
     bool result = renderer_end_frame(packet->delta_time);
     if (!result) {
@@ -153,15 +111,31 @@ bool renderer_draw_frame(render_packet *packet) {
 
 void renderer_set_view(mat4 view) { state_ptr->view = view; }
 
-void renderer_create_texture(cstr name, i32 width, i32 height,
-                             i32 channel_count, robytes pixels,
-                             bool has_transparency, Texture *out_texture) {
-  state_ptr->backend.create_texture(name, width, height, channel_count, pixels,
-                                    has_transparency, out_texture);
+void renderer_create_texture(robytes pixels, Texture *texture) {
+  state_ptr->backend.create_texture(pixels, texture);
 }
 
 void renderer_destroy_texture(Texture *texture) {
   state_ptr->backend.destroy_texture(texture);
+}
+
+bool renderer_create_material(Material *material) {
+  return state_ptr->backend.create_material(material);
+}
+
+void renderer_destroy_material(Material *material) {
+  state_ptr->backend.destroy_material(material);
+}
+
+bool renderer_create_geometry(Geometry *geometry, u32 vertex_count,
+                              vertex_3d const *vertices, u32 index_count,
+                              u32 const *indices) {
+  return state_ptr->backend.create_geometry(geometry, vertex_count, vertices,
+                                            index_count, indices);
+}
+
+void renderer_destroy_geometry(Geometry *geometry) {
+  state_ptr->backend.destroy_geometry(geometry);
 }
 
 } // namespace ns

@@ -18,6 +18,8 @@
 #include "./vulkan_types.inl"
 #include "./vulkan_utils.h"
 
+#include "../../systems/material_system.h"
+
 namespace ns::vulkan {
 
 static Context context;
@@ -39,7 +41,7 @@ bool recreate_swapchain(renderer_backend *backend);
 
 void upload_data_range(Context *context, VkCommandPool pool, VkFence fence,
                        VkQueue queue, Buffer *buffer, usize offset, usize size,
-                       ptr data) {
+                       roptr data) {
   VkBufferUsageFlags flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   Buffer staging;
@@ -51,8 +53,9 @@ void upload_data_range(Context *context, VkCommandPool pool, VkFence fence,
   buffer_destroy(context, &staging);
 }
 
-bool renderer_backend_initialize(renderer_backend *backend,
-                                 cstr application_name) {
+void free_data_range(Buffer * /*buffer*/, u64 /*offset*/, u64 /*size*/) {}
+
+bool backend_initialize(renderer_backend *backend, cstr application_name) {
   context.find_memory_index = find_memory_index;
 
   // TODO(ClementChambard): custom allocator
@@ -209,52 +212,15 @@ bool renderer_backend_initialize(renderer_backend *backend,
 
   create_buffers(&context);
 
-  // TODO(ClementChambard): Temporary test code
-  const u32 vertex_count = 4;
-  vertex_3d verts[vertex_count];
-  mem_zero(verts, sizeof(vertex_3d) * vertex_count);
-  verts[0].position.x = -5.0f;
-  verts[0].position.y = -5.0f;
-  verts[0].texcoord.u = 0.0f;
-  verts[0].texcoord.v = 0.0f;
-  verts[1].position.x = 5.0f;
-  verts[1].position.y = -5.0f;
-  verts[1].texcoord.u = 1.0f;
-  verts[1].texcoord.v = 0.0f;
-  verts[2].position.x = 5.0f;
-  verts[2].position.y = 5.0f;
-  verts[2].texcoord.u = 1.0f;
-  verts[2].texcoord.v = 1.0f;
-  verts[3].position.x = -5.0f;
-  verts[3].position.y = 5.0f;
-  verts[3].texcoord.u = 0.0f;
-  verts[3].texcoord.v = 1.0f;
-
-  const u32 index_count = 6;
-  u32 indices[index_count] = {0, 1, 2, 0, 2, 3};
-
-  upload_data_range(&context, context.device.graphics_command_pool, 0,
-                    context.device.graphics_queue,
-                    &context.object_vertex_buffer, 0,
-                    sizeof(vertex_3d) * vertex_count, verts);
-  upload_data_range(&context, context.device.graphics_command_pool, 0,
-                    context.device.graphics_queue, &context.object_index_buffer,
-                    0, sizeof(u32) * index_count, indices);
-
-  u32 object_id = 0;
-  if (!material_shader_acquire_resources(&context, &context.material_shader,
-                                         &object_id)) {
-    NS_ERROR("Failed to acquire shader resources.");
-    return false;
+  for (u32 i = 0; i < Context::MAX_GEOMETRY_COUNT; i++) {
+    context.geometries[i].id = INVALID_ID;
   }
-
-  // TODO(ClementChambard): End temp code
 
   NS_INFO("Vulkan renderer initialized successfully.");
   return true;
 }
 
-void renderer_backend_shutdown(renderer_backend * /* backend */) {
+void backend_shutdown(renderer_backend * /* backend */) {
   vkDeviceWaitIdle(context.device);
 
   buffer_destroy(&context, &context.object_vertex_buffer);
@@ -319,8 +285,8 @@ void renderer_backend_shutdown(renderer_backend * /* backend */) {
   vkDestroyInstance(context.instance, context.allocator);
 }
 
-void renderer_backend_on_resized(renderer_backend * /* backend */, u16 width,
-                                 u16 height) {
+void backend_on_resized(renderer_backend * /* backend */, u16 width,
+                        u16 height) {
   cached_framebuffer_width = width;
   cached_framebuffer_height = height;
   context.framebuffer_size_generation++;
@@ -329,7 +295,7 @@ void renderer_backend_on_resized(renderer_backend * /* backend */, u16 width,
           height, context.framebuffer_size_generation);
 }
 
-bool renderer_backend_begin_frame(renderer_backend *backend, f32 delta_time) {
+bool backend_begin_frame(renderer_backend *backend, f32 delta_time) {
   context.frame_delta_time = delta_time;
   if (context.recreating_swapchain) {
     VkResult result = vkDeviceWaitIdle(context.device);
@@ -408,9 +374,9 @@ bool renderer_backend_begin_frame(renderer_backend *backend, f32 delta_time) {
   return true;
 }
 
-void renderer_update_global_state(mat4 projection, mat4 view,
-                                  vec3 /*view_position*/,
-                                  vec4 /*ambient_color*/, i32 /*mode*/) {
+void backend_update_global_state(mat4 projection, mat4 view,
+                                 vec3 /*view_position*/, vec4 /*ambient_color*/,
+                                 i32 /*mode*/) {
   material_shader_use(&context, &context.material_shader);
 
   context.material_shader.global_ubo.projection = projection;
@@ -420,8 +386,7 @@ void renderer_update_global_state(mat4 projection, mat4 view,
                                       context.frame_delta_time);
 }
 
-bool renderer_backend_end_frame(renderer_backend * /* backend */,
-                                f32 /* delta_time */) {
+bool backend_end_frame(renderer_backend * /* backend */, f32 /* delta_time */) {
   CommandBuffer *command_buffer =
       &context.graphics_command_buffers[context.image_index];
 
@@ -631,38 +596,14 @@ bool create_buffers(Context *context) {
   return true;
 }
 
-// temp
-void renderer_update_object(geometry_render_data data) {
-  material_shader_update_object(&context, &context.material_shader, data);
-  CommandBuffer *command_buffer =
-      &context.graphics_command_buffers[context.image_index];
-
-  // TODO(ClementChambard): Temporary code
-  material_shader_use(&context, &context.material_shader);
-  VkDeviceSize offsets[1] = {0};
-  vkCmdBindVertexBuffers(command_buffer->handle, 0, 1,
-                         &context.object_vertex_buffer.handle, offsets);
-  vkCmdBindIndexBuffer(command_buffer->handle,
-                       context.object_index_buffer.handle, 0,
-                       VK_INDEX_TYPE_UINT32);
-  vkCmdDrawIndexed(command_buffer->handle, 6, 1, 0, 0, 0);
-  // TODO(ClementChambard): Temporary code end
-}
-
-void renderer_create_texture(cstr /*name*/, i32 width, i32 height,
-                             i32 channel_count, robytes pixels,
-                             bool has_transparency, Texture *out_texture) {
-  out_texture->width = width;
-  out_texture->height = height;
-  out_texture->channel_count = channel_count;
-  out_texture->generation = INVALID_ID;
-
+void backend_create_texture(robytes pixels, Texture *texture) {
   // TODO(ClementChambard): Use an allocator for this
-  out_texture->internal_data = ns::alloc(sizeof(TextureData), mem_tag::TEXTURE);
+  texture->internal_data = ns::alloc(sizeof(TextureData), mem_tag::TEXTURE);
   TextureData *texture_data =
-      reinterpret_cast<TextureData *>(out_texture->internal_data);
+      reinterpret_cast<TextureData *>(texture->internal_data);
 
-  VkDeviceSize image_size = width * height * channel_count;
+  VkDeviceSize image_size =
+      texture->width * texture->height * texture->channel_count;
   VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
   VkBufferUsageFlagBits usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
   VkMemoryPropertyFlags memory_prop_flags =
@@ -673,7 +614,7 @@ void renderer_create_texture(cstr /*name*/, i32 width, i32 height,
   buffer_load_data(&context, &staging, 0, image_size, 0, pixels);
 
   image_create(
-      &context, VK_IMAGE_TYPE_2D, width, height, image_format,
+      &context, VK_IMAGE_TYPE_2D, texture->width, texture->height, image_format,
       VK_IMAGE_TILING_OPTIMAL,
       VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
           VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -724,11 +665,10 @@ void renderer_create_texture(cstr /*name*/, i32 width, i32 height,
     return;
   }
 
-  out_texture->has_transparency = has_transparency;
-  out_texture->generation++;
+  texture->generation++;
 }
 
-void renderer_destroy_texture(Texture *texture) {
+void backend_destroy_texture(Texture *texture) {
   vkDeviceWaitIdle(context.device);
 
   TextureData *texture_data =
@@ -745,6 +685,168 @@ void renderer_destroy_texture(Texture *texture) {
 
   ns::free(texture->internal_data, sizeof(TextureData), mem_tag::TEXTURE);
   mem_zero(texture, sizeof(Texture));
+}
+
+bool backend_create_material(Material *material) {
+  if (!material) {
+    NS_ERROR("vulkan::renderer_create_material - material is null");
+    return false;
+  }
+  if (!material_shader_acquire_resources(&context, &context.material_shader,
+                                         material)) {
+    NS_ERROR("vulkan::renderer_create_material - "
+             "material_shader_acquire_resources failed");
+    return false;
+  }
+  NS_TRACE("Renderer: material created.");
+  return true;
+}
+
+void backend_destroy_material(Material *material) {
+  if (!material) {
+    NS_WARN("vulkan::renderer_destroy_material - material is null");
+    return;
+  }
+  if (material->internal_id == INVALID_ID) {
+    NS_WARN(
+        "vulkan::renderer_destroy_material - material has invalid internal id");
+    return;
+  }
+  material_shader_release_resources(&context, &context.material_shader,
+                                    material);
+}
+
+bool backend_create_geometry(Geometry *geometry, u32 vertex_count,
+                             vertex_3d const *vertices, u32 index_count,
+                             u32 const *indices) {
+  if (!vertex_count || !vertices) {
+    NS_ERROR("vulkan::renderer_create_geometry - vertex_count or vertices "
+             "is null");
+    return false;
+  }
+
+  bool is_reupload = geometry->internal_id != INVALID_ID;
+  GeometryData old_range;
+
+  GeometryData *internal_data = nullptr;
+  if (is_reupload) {
+    internal_data = &context.geometries[geometry->internal_id];
+
+    old_range.index_buffer_offset = internal_data->index_buffer_offset;
+    old_range.index_count = internal_data->index_count;
+    old_range.vertex_buffer_offset = internal_data->vertex_buffer_offset;
+    old_range.vertex_count = internal_data->vertex_count;
+    old_range.index_size = internal_data->index_size;
+    old_range.vertex_size = internal_data->vertex_size;
+  } else {
+    for (u32 i = 0; i < Context::MAX_GEOMETRY_COUNT; i++) {
+      if (context.geometries[i].id == INVALID_ID) {
+        geometry->internal_id = i;
+        context.geometries[i].id = i;
+        internal_data = &context.geometries[i];
+        break;
+      }
+    }
+  }
+  if (!internal_data) {
+    NS_ERROR("vulkan::renderer_create_geometry - failed to find free geometry "
+             "index");
+    return false;
+  }
+
+  VkCommandPool pool = context.device.graphics_command_pool;
+  VkQueue queue = context.device.graphics_queue;
+
+  internal_data->vertex_buffer_offset = context.geometry_vertex_offset;
+  internal_data->vertex_count = vertex_count;
+  internal_data->vertex_size = sizeof(vertex_3d) * vertex_count;
+  upload_data_range(&context, pool, 0, queue, &context.object_vertex_buffer,
+                    internal_data->vertex_buffer_offset,
+                    internal_data->vertex_size, vertices);
+  context.geometry_vertex_offset += internal_data->vertex_size;
+
+  if (index_count && indices) {
+    internal_data->index_buffer_offset = context.geometry_index_offset;
+    internal_data->index_count = index_count;
+    internal_data->index_size = sizeof(u32) * index_count;
+    upload_data_range(&context, pool, 0, queue, &context.object_index_buffer,
+                      internal_data->index_buffer_offset,
+                      internal_data->index_size, indices);
+    context.geometry_index_offset += internal_data->index_size;
+  }
+
+  if (internal_data->generation == INVALID_ID) {
+    internal_data->generation = 0;
+  } else {
+    internal_data->generation++;
+  }
+
+  if (is_reupload) {
+    free_data_range(&context.object_vertex_buffer,
+                    old_range.vertex_buffer_offset, old_range.vertex_size);
+    if (old_range.index_size > 0) {
+      free_data_range(&context.object_index_buffer,
+                      old_range.index_buffer_offset, old_range.index_size);
+    }
+  }
+
+  return true;
+}
+
+void backend_destroy_geometry(Geometry *geometry) {
+  if (!geometry || geometry->internal_id == INVALID_ID) {
+    return;
+  }
+  vkDeviceWaitIdle(context.device);
+  GeometryData *internal_data = &context.geometries[geometry->internal_id];
+
+  free_data_range(&context.object_vertex_buffer,
+                  internal_data->vertex_buffer_offset,
+                  internal_data->vertex_size);
+  if (internal_data->index_size > 0) {
+    free_data_range(&context.object_index_buffer,
+                    internal_data->index_buffer_offset,
+                    internal_data->index_size);
+  }
+
+  mem_zero(internal_data, sizeof(GeometryData));
+  internal_data->generation = INVALID_ID;
+  internal_data->id = INVALID_ID;
+}
+
+void backend_draw_geometry(geometry_render_data data) {
+  if (!data.geometry || data.geometry->internal_id == INVALID_ID) {
+    return;
+  }
+
+  GeometryData *buffer_data = &context.geometries[data.geometry->internal_id];
+  VkCommandBuffer command_buffer =
+      context.graphics_command_buffers[context.image_index];
+
+  // TODO(ClementChambard): Check if needed
+  material_shader_use(&context, &context.material_shader);
+
+  material_shader_set_model(&context, &context.material_shader, data.model);
+  if (data.geometry->material) {
+    material_shader_apply_material(&context, &context.material_shader,
+                                   data.geometry->material);
+  } else {
+    material_shader_apply_material(&context, &context.material_shader,
+                                   material_system_get_default());
+  }
+
+  VkDeviceSize offsets[1] = {buffer_data->vertex_buffer_offset};
+  vkCmdBindVertexBuffers(command_buffer, 0, 1,
+                         &context.object_vertex_buffer.handle, offsets);
+
+  if (buffer_data->index_count > 0) {
+    vkCmdBindIndexBuffer(command_buffer, context.object_index_buffer.handle,
+                         buffer_data->index_buffer_offset,
+                         VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(command_buffer, buffer_data->index_count, 1, 0, 0, 0);
+  } else {
+    vkCmdDraw(command_buffer, buffer_data->vertex_count, 1, 0, 0);
+  }
 }
 
 } // namespace ns::vulkan

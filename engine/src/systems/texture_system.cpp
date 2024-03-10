@@ -35,6 +35,7 @@ static texture_system_state *state_ptr = nullptr;
 bool create_default_textures(texture_system_state *state);
 void destroy_default_textures(texture_system_state *state);
 bool load_texture(cstr texture_name, Texture *t);
+void destroy_texture(Texture *t);
 
 bool texture_system_initialize(usize *memory_requirement, ptr state,
                                texture_system_config config) {
@@ -165,27 +166,26 @@ void texture_system_release(cstr name) {
     NS_WARN("Tried to release non-existent texture: '%s'.", name);
     return;
   }
+  char name_copy[Texture::NAME_MAX_LENGTH];
+  string_ncpy(name_copy, name, Texture::NAME_MAX_LENGTH);
+
   ref.reference_count--;
   if (ref.reference_count == 0 && ref.auto_release) {
     Texture *t = &state_ptr->registered_textures[ref.handle];
 
-    renderer_destroy_texture(t);
-
-    mem_zero(t, sizeof(Texture));
-    t->id = INVALID_ID;
-    t->generation = INVALID_ID;
+    destroy_texture(t);
 
     ref.handle = INVALID_ID;
     ref.auto_release = false;
     NS_TRACE(
         "Released texture '%s'. Texture unloaded because reference count = 0.",
-        name);
+        name_copy);
   } else {
-    NS_TRACE("Released texture '%s'. Reference count decreased to %i.", name,
-             ref.reference_count);
+    NS_TRACE("Released texture '%s'. Reference count decreased to %i.",
+             name_copy, ref.reference_count);
   }
 
-  state_ptr->registered_textures_table.set(name, &ref);
+  state_ptr->registered_textures_table.set(name_copy, &ref);
 }
 
 Texture *texture_system_get_default_texture() {
@@ -221,8 +221,14 @@ bool create_default_textures(texture_system_state *state) {
     }
   }
 
-  renderer_create_texture(DEFAULT_TEXTURE_NAME, tex_dimension, tex_dimension,
-                          channels, pixels, false, &state->default_texture);
+  string_ncpy(state->default_texture.name, DEFAULT_TEXTURE_NAME,
+              Texture::NAME_MAX_LENGTH);
+  state->default_texture.width = tex_dimension;
+  state->default_texture.height = tex_dimension;
+  state->default_texture.channel_count = channels;
+  state->default_texture.has_transparency = false;
+  state->default_texture.generation = INVALID_ID;
+  renderer_create_texture(pixels, &state->default_texture);
 
   state->default_texture.generation = INVALID_ID;
 
@@ -231,7 +237,7 @@ bool create_default_textures(texture_system_state *state) {
 
 void destroy_default_textures(texture_system_state *state) {
   if (state) {
-    renderer_destroy_texture(&state->default_texture);
+    destroy_texture(&state->default_texture);
   }
 }
 
@@ -257,6 +263,7 @@ bool load_texture(cstr texture_name, Texture *t) {
   if (!data) {
     NS_WARN("load_texture(): Failed to load file '%s': %s", full_file_path,
             stbi_failure_reason());
+    stbi__err(0, 0);
     return false;
   }
   u32 current_generation = t->generation;
@@ -274,11 +281,15 @@ bool load_texture(cstr texture_name, Texture *t) {
   if (stbi_failure_reason()) {
     NS_WARN("load_texture(): Failed to load file '%s': %s", full_file_path,
             stbi_failure_reason());
+    stbi__err(0, 0);
+    return false;
   }
 
-  renderer_create_texture(texture_name, temp_texture.width, temp_texture.height,
-                          temp_texture.channel_count, data, has_transparency,
-                          &temp_texture);
+  string_ncpy(temp_texture.name, texture_name, Texture::NAME_MAX_LENGTH);
+  temp_texture.generation = INVALID_ID;
+  temp_texture.has_transparency = has_transparency;
+
+  renderer_create_texture(data, &temp_texture);
 
   Texture old = *t;
   *t = temp_texture;
@@ -293,6 +304,14 @@ bool load_texture(cstr texture_name, Texture *t) {
 
   stbi_image_free(data);
   return true;
+}
+
+void destroy_texture(Texture *t) {
+  renderer_destroy_texture(t);
+
+  mem_zero(t, sizeof(Texture));
+  t->id = INVALID_ID;
+  t->generation = INVALID_ID;
 }
 
 } // namespace ns

@@ -157,17 +157,29 @@ struct DescriptorState {
   NSID ids[3];
 };
 
-struct MaterialShader {
-  static constexpr usize SHADER_STAGE_COUNT = 2;
-  static constexpr usize SHADER_DESCRIPTOR_COUNT = 2;
-  static constexpr usize MAX_OBJECT_COUNT = 1024;
+struct GeometryData {
+  NSID id;
+  u32 generation;
+  u32 vertex_count;
+  u32 vertex_buffer_offset;
+  u32 vertex_size;
+  u32 index_count;
+  u32 index_buffer_offset;
+  u32 index_size;
+};
 
-  struct ObjectState {
+struct MaterialShader {
+  static constexpr usize STAGE_COUNT = 2;
+  static constexpr usize DESCRIPTOR_COUNT = 2;
+  static constexpr usize SAMPLER_COUNT = 1;
+  static constexpr usize MAX_MATERIAL_COUNT = 1024;
+
+  struct InstanceState {
     VkDescriptorSet descriptor_sets[3];
-    DescriptorState descriptor_states[SHADER_DESCRIPTOR_COUNT];
+    DescriptorState descriptor_states[DESCRIPTOR_COUNT];
   };
 
-  ShaderStage stages[SHADER_STAGE_COUNT];
+  ShaderStage stages[STAGE_COUNT];
 
   VkDescriptorPool global_descriptor_pool;
   VkDescriptorSetLayout global_descriptor_set_layout;
@@ -182,12 +194,16 @@ struct MaterialShader {
   Buffer object_uniform_buffer;
   u32 object_uniform_buffer_index;
 
-  ObjectState object_states[MAX_OBJECT_COUNT];
+  TextureUse sampler_uses[SAMPLER_COUNT];
+
+  InstanceState instance_states[MAX_MATERIAL_COUNT];
 
   Pipeline pipeline;
 };
 
 struct Context {
+  static constexpr usize MAX_GEOMETRY_COUNT = 4096;
+
   f32 frame_delta_time;
   // XXX: ERROR when using these: not in sync with swapchain capabilities
   // u32 framebuffer_width;
@@ -227,6 +243,8 @@ struct Context {
 
   usize geometry_vertex_offset;
   usize geometry_index_offset;
+
+  GeometryData geometries[MAX_GEOMETRY_COUNT];
 
   i32 (*find_memory_index)(u32 type_filter, u32 property_flags);
 };

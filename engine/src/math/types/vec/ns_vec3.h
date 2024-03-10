@@ -1,6 +1,7 @@
 #ifndef NS_VEC3_HEADER_INCLUDED
 #define NS_VEC3_HEADER_INCLUDED
 
+#include "../../../core/ns_string.h"
 #include "../../../defines.h"
 #include "../../ns_cstes.h"
 #include "./ns_vec2.h"
@@ -147,6 +148,12 @@ struct vec3 {
   static vec3 right() { return {1.0f, 0.0f, 0.0f}; }
   static vec3 back() { return {0.0f, 0.0f, -1.0f}; }
   static vec3 forward() { return {0.0f, 0.0f, 1.0f}; }
+
+  bool from(cstr s) {
+    if (!s)
+      return false;
+    return string_scanf(s, "%f %f %f", &x, &y, &z) != -1;
+  }
 };
 
 } // namespace ns
