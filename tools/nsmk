@@ -49,12 +49,6 @@ elif [ $# -eq 1 ]; then
   if [ "$1" = "configure" ]; then
     mkdir -p $NSENGINE_BUILD_DIR && cd $NSENGINE_BUILD_DIR && cmake -GNinja ..
     exit $?
-  elif [ "$1" = "log" ]; then
-    cat $NSENGINE_BUILD_DIR/console.log
-    exit $?
-  elif [ "$1" = "vimlog" ]; then
-    nvim $NSENGINE_BUILD_DIR/console.log
-    exit $?
   elif [ "$1" = "vim" ]; then
     nvim
     exit $?
@@ -75,7 +69,7 @@ elif [ $# -eq 1 ]; then
     rm -rf $NSENGINE_BUILD_DIR
     exit $?
   elif [ "$1" = "clean" ]; then
-    cd $NSENGINE_BUILD_DIR > /dev/null 2> /dev/null && ninja clean && rm -rf assets
+    cd $NSENGINE_BUILD_DIR > /dev/null 2> /dev/null && ninja clean
     exit $?
   fi
 

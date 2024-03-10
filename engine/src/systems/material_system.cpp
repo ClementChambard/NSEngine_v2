@@ -7,7 +7,7 @@
 #include "../renderer/renderer_frontend.h"
 #include "./texture_system.h"
 
-#include "../platform/filesystem.h"
+#include "./resource_system.h"
 
 #include <new>
 
@@ -29,9 +29,8 @@ struct material_reference {
 static material_system_state *state_ptr = nullptr;
 
 bool create_default_material(material_system_state *state);
-bool load_material(material_config config, Material *m);
+bool load_material(MaterialConfig config, Material *m);
 void destroy_material(Material *m);
-bool load_configuration_file(cstr path, material_config *out_config);
 
 bool material_system_initialize(usize *memory_requirement, ptr state,
                                 material_system_config config) {
@@ -101,21 +100,32 @@ Material *material_system_acquire(cstr name) {
     return nullptr;
   }
 
-  material_config config{};
-  cstr format_str = "assets/materials/%s.%s";
-  char full_file_path[512];
-
-  string_fmt(full_file_path, sizeof(full_file_path), format_str, name, "nsmt");
-  if (!load_configuration_file(full_file_path, &config)) {
-    NS_ERROR("Failed to load material file '%s'. nullptr will be returned.",
-             full_file_path);
+  Resource material_resource;
+  if (!resource_system_load(name, ResourceType::MATERIAL, &material_resource)) {
+    NS_ERROR("material_system_acquire failed to acquire material '%s'. Null "
+             "pointer will be returned.",
+             name);
     return nullptr;
   }
 
-  return material_system_acquire(config);
+  Material *m = nullptr;
+  if (material_resource.data) {
+    m = material_system_acquire(
+        *reinterpret_cast<MaterialConfig *>(material_resource.data));
+  }
+
+  resource_system_unload(&material_resource);
+
+  if (!m) {
+    NS_ERROR("material_system_acquire failed to acquire material '%s'. Null "
+             "pointer will be returned.",
+             name);
+  }
+
+  return m;
 }
 
-Material *material_system_acquire(material_config config) {
+Material *material_system_acquire(MaterialConfig config) {
   if (state_ptr == nullptr) {
     NS_FATAL("material_system_acquire - State pointer is null");
     return nullptr;
@@ -220,7 +230,7 @@ Material *material_system_get_default() {
   return &state_ptr->default_material;
 }
 
-bool load_material(material_config config, Material *m) {
+bool load_material(MaterialConfig config, Material *m) {
   mem_zero(m, sizeof(Material));
 
   string_ncpy(m->name, config.name, Material::NAME_MAX_LENGTH);
@@ -283,69 +293,6 @@ bool create_default_material(material_system_state *state) {
     NS_FATAL("Failed to acquire render resources for default material.");
     return false;
   }
-
-  return true;
-}
-
-bool load_configuration_file(cstr path, material_config *out_config) {
-  fs::File f;
-  if (!fs::open(path, fs::Mode::READ, false, &f)) {
-    NS_ERROR("Failed to open material file for reading: '%s'.", path);
-    return false;
-  }
-
-  char linebuf[512] = "";
-  str p = &linebuf[0];
-  usize linelen = 0;
-  u32 linenum = 1;
-  while (fs::read_line(&f, 511, &p, &linelen)) {
-    str line = string_trim(p);
-    linelen = string_length(line);
-
-    if (linelen < 1 || line[0] == '#') {
-      linenum++;
-      continue;
-    }
-
-    isize equal_index = string_indexof(line, '=');
-    if (equal_index == -1) {
-      NS_WARN("Potential formatting issue found in '%s:%d': '=' not found.",
-              path, linenum);
-      linenum++;
-      continue;
-    }
-
-    char raw_var_name[64];
-    mem_zero(raw_var_name, sizeof(raw_var_name));
-    string_sub(raw_var_name, line, 0, equal_index);
-    str var_name = string_trim(raw_var_name);
-
-    char raw_var_value[446];
-    mem_zero(raw_var_value, sizeof(raw_var_value));
-    string_sub(raw_var_value, line, equal_index + 1, -1);
-    str var_value = string_trim(raw_var_value);
-
-    if (string_EQ(var_name, "version")) {
-      // TODO(ClementChambard)
-    } else if (string_EQ(var_name, "name")) {
-      string_ncpy(out_config->name, var_value, Material::NAME_MAX_LENGTH);
-    } else if (string_EQ(var_name, "diffuse_color")) {
-      if (!out_config->diffuse_color.from(var_value)) {
-        NS_WARN(
-            "Error parsing diffuse_color in file '%s'. Using white instead.",
-            path);
-      }
-    } else if (string_EQ(var_name, "diffuse_map_name")) {
-      string_ncpy(out_config->diffuse_map_name, var_value,
-                  Texture::NAME_MAX_LENGTH);
-    }
-    // TODO(ClementChambard): more
-
-    mem_zero(linebuf, sizeof(linebuf));
-    linenum++;
-  }
-
-  fs::close(&f);
 
   return true;
 }

@@ -59,6 +59,16 @@ void close(File *handle) {
   }
 }
 
+bool fsize(File *handle, usize *out_size) {
+  if (handle->handle) {
+    std::fseek(HANDLE(handle), 0, SEEK_END);
+    *out_size = std::ftell(HANDLE(handle));
+    std::rewind(HANDLE(handle));
+    return true;
+  }
+  return false;
+}
+
 bool read_line(File *handle, usize max_length, str *line_buf,
                u64 *out_line_length) {
   if (!handle->handle || !line_buf || !out_line_length || max_length == 0)
@@ -90,17 +100,32 @@ bool read(File *handle, usize data_size, ptr out_data, usize *out_bytes_read) {
   return *out_bytes_read == data_size;
 }
 
-bool read_all_bytes(File *handle, bytes *out_bytes, usize *out_bytes_read) {
-  if (!handle->handle)
+bool read_all_bytes(File *handle, bytes out_bytes, usize *out_bytes_read) {
+  if (!handle->handle || !out_bytes)
     return false;
-  std::fseek(HANDLE(handle), 0, SEEK_END);
-  usize size = std::ftell(HANDLE(handle));
-  std::rewind(HANDLE(handle));
+  usize s = 0;
+  if (!fsize(handle, &s))
+    return false;
 
-  *out_bytes =
-      reinterpret_cast<bytes>(alloc(sizeof(u8) * size, mem_tag::STRING));
-  *out_bytes_read = std::fread(*out_bytes, 1, size, HANDLE(handle));
-  return *out_bytes_read == size;
+  usize nread = std::fread(out_bytes, 1, s, HANDLE(handle));
+  if (out_bytes_read) {
+    *out_bytes_read = nread;
+  }
+  return nread == s;
+}
+
+bool read_all_text(File *handle, str out_text, usize *out_bytes_read) {
+  if (!handle->handle || !out_text)
+    return false;
+  usize s = 0;
+  if (!fsize(handle, &s))
+    return false;
+
+  usize nread = std::fread(out_text, 1, s, HANDLE(handle));
+  if (out_bytes_read) {
+    *out_bytes_read = nread;
+  }
+  return nread == s;
 }
 
 bool write(File *handle, usize data_size, roptr data,

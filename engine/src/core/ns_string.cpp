@@ -3,6 +3,8 @@
 #include <cstring>
 #include <ctype.h>
 
+#include "./ns_memory.h"
+
 // #ifndef _MSC_VER
 // #include <strings.h>
 // #endif
@@ -25,8 +27,9 @@ str string_dup(cstr s) {
   if (!s)
     return nullptr;
   usize length = string_length(s);
-  str out = new char[length + 1];
-  std::memcpy(out, s, length);
+  str out = reinterpret_cast<str>(
+      ns::alloc((length + 1) * sizeof(char), mem_tag::STRING));
+  mem_copy(out, s, length);
   out[length] = 0;
   return out;
 }

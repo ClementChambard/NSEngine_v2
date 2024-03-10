@@ -5,6 +5,30 @@
 
 namespace ns {
 
+enum class ResourceType {
+  TEXT,
+  BINARY,
+  IMAGE,
+  MATERIAL,
+  STATIC_MESH,
+  CUSTOM,
+};
+
+struct Resource {
+  u32 loader_id;
+  cstr name;
+  str full_path;
+  usize data_size;
+  ptr data;
+};
+
+struct ImageResourceData {
+  u8 channel_count;
+  u32 width;
+  u32 height;
+  bytes pixels;
+};
+
 struct Texture {
   static constexpr usize NAME_MAX_LENGTH = 512;
   NSID id;
@@ -35,6 +59,13 @@ struct Material {
   char name[NAME_MAX_LENGTH];
   vec4 diffuse_color;
   TextureMap diffuse_map;
+};
+
+struct MaterialConfig {
+  char name[Material::NAME_MAX_LENGTH];
+  bool auto_release;
+  vec4 diffuse_color;
+  char diffuse_map_name[Texture::NAME_MAX_LENGTH];
 };
 
 struct Geometry {

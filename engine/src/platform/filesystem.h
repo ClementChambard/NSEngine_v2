@@ -51,6 +51,14 @@ NS_API bool open(cstr path, Mode mode, bool binary, File *out_handle);
 NS_API void close(File *handle);
 
 /**
+ * Gets the size of a file
+ * @param handle The handle of the file
+ * @param out_size The size of the file
+ * @returns True if the size was retrieved successfully
+ */
+NS_API bool fsize(File *handle, usize *out_size);
+
+/**
  * Reads a line from a file
  * @param handle The handle of the file
  * @param max_length The maximum length of the line
@@ -87,8 +95,17 @@ NS_API bool read(File *handle, usize data_size, ptr out_data,
  * @param out_bytes_read The number of bytes read
  * @returns True if the data was read successfully
  */
-NS_API bool read_all_bytes(File *handle, bytes *out_bytes,
+NS_API bool read_all_bytes(File *handle, bytes out_bytes,
                            usize *out_bytes_read);
+
+/**
+ * Reads all text from a file
+ * @param handle The handle of the file
+ * @param out_text The buffer to store the text in
+ * @param out_bytes_read The number of bytes read
+ * @returns True if the text was read successfully
+ */
+NS_API bool read_all_text(File *handle, str out_text, usize *out_bytes_read);
 
 /**
  * Writes data to a file

@@ -9,9 +9,7 @@
 
 #include <new>
 
-// TODO(ClementChambard): resource loader.
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include "./resource_system.h"
 
 namespace ns {
 
@@ -242,54 +240,36 @@ void destroy_default_textures(texture_system_state *state) {
 }
 
 bool load_texture(cstr texture_name, Texture *t) {
-  cstr format_str = "assets/textures/%s.%s";
-  const i32 required_channel_count = 4;
-  stbi_set_flip_vertically_on_load(true);
-  char full_file_path[512];
+  Resource img_resource;
+  if (!resource_system_load(texture_name, ResourceType::IMAGE, &img_resource)) {
+    NS_ERROR("Failed to load image resource for texture '%s'.", texture_name);
+    return false;
+  }
 
-  // TODO(ClementChambard): try different extensions
-  string_fmt(full_file_path, sizeof(full_file_path), format_str, texture_name,
-             "png");
+  ImageResourceData *data =
+      reinterpret_cast<ImageResourceData *>(img_resource.data);
 
   // temp texture to load into
   Texture temp_texture;
-  u8 *data =
-      stbi_load(full_file_path, reinterpret_cast<i32 *>(&temp_texture.width),
-                reinterpret_cast<i32 *>(&temp_texture.height),
-                reinterpret_cast<i32 *>(&temp_texture.channel_count),
-                required_channel_count);
+  temp_texture.width = data->width;
+  temp_texture.height = data->height;
+  temp_texture.channel_count = data->channel_count;
 
-  temp_texture.channel_count = required_channel_count;
-  if (!data) {
-    NS_WARN("load_texture(): Failed to load file '%s': %s", full_file_path,
-            stbi_failure_reason());
-    stbi__err(0, 0);
-    return false;
-  }
   u32 current_generation = t->generation;
   t->generation = INVALID_ID;
   usize total_size =
-      temp_texture.width * temp_texture.height * required_channel_count;
-  bool has_transparency = false;
-  for (usize i = 0; i < total_size; i += required_channel_count) {
-    if (data[i + 3] < 255) {
-      has_transparency = true;
+      temp_texture.width * temp_texture.height * temp_texture.channel_count;
+  for (usize i = 0; i < total_size; i += temp_texture.channel_count) {
+    if (data->pixels[i + 3] < 255) {
+      temp_texture.has_transparency = true;
       break;
     }
   }
 
-  if (stbi_failure_reason()) {
-    NS_WARN("load_texture(): Failed to load file '%s': %s", full_file_path,
-            stbi_failure_reason());
-    stbi__err(0, 0);
-    return false;
-  }
-
   string_ncpy(temp_texture.name, texture_name, Texture::NAME_MAX_LENGTH);
   temp_texture.generation = INVALID_ID;
-  temp_texture.has_transparency = has_transparency;
 
-  renderer_create_texture(data, &temp_texture);
+  renderer_create_texture(data->pixels, &temp_texture);
 
   Texture old = *t;
   *t = temp_texture;
@@ -302,7 +282,7 @@ bool load_texture(cstr texture_name, Texture *t) {
     t->generation = current_generation + 1;
   }
 
-  stbi_image_free(data);
+  resource_system_unload(&img_resource);
   return true;
 }
 

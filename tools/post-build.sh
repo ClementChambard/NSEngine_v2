@@ -1,15 +1,12 @@
 #!/bin/bash
 
-mkdir -p build/assets/
-
-SHADER_INPUT_PATH="assets/shaders"
-SHADER_OUTPUT_PATH="build/assets/shaders"
+SHADER_PATH="assets/shaders"
 
 compile_shader_sub() {
-  NAME=$1
+  NAME="$SHADER_PATH/$1"
   TYPE=$2
-  echo "  - $SHADER_INPUT_PATH/$NAME.$TYPE.glsl -> $SHADER_OUTPUT_PATH/$NAME.$TYPE.spv"
-  glslc -fshader-stage=$TYPE $SHADER_INPUT_PATH/$NAME.$TYPE.glsl -o $SHADER_OUTPUT_PATH/$NAME.$TYPE.spv
+  echo "  - $NAME.$TYPE.glsl -> $NAME.$TYPE.spv"
+  glslc -fshader-stage=$TYPE $NAME.$TYPE.glsl -o $NAME.$TYPE.spv
   if [ $? -ne 0 ]; then
     echo "Error: $?"
     exit 1
@@ -30,13 +27,5 @@ compile_shader() {
 # compile all shaders
 echo "Compiling shaders..."
 
-mkdir -p $SHADER_OUTPUT_PATH
-
 compile_shader "Builtin" "MaterialShader"
 # ...
-
-
-# copy assets
-echo "Copying assets..."
-echo "cp -R \"assets\" \"build\""
-cp -R "assets" "build"
