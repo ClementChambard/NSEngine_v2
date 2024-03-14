@@ -6,14 +6,15 @@
 namespace ns::vulkan {
 
 bool graphics_pipeline_create(Context *context, Renderpass *renderpass,
-                              u32 attribute_count,
+                              u32 stride, u32 attribute_count,
                               VkVertexInputAttributeDescription *attributes,
                               u32 descriptor_set_layout_count,
                               VkDescriptorSetLayout *descriptor_set_layouts,
                               u32 stage_count,
                               VkPipelineShaderStageCreateInfo *stages,
                               VkViewport viewport, VkRect2D scissor,
-                              bool is_wireframe, Pipeline *out_pipeline) {
+                              bool is_wireframe, bool depth_test_enabled,
+                              Pipeline *out_pipeline) {
   VkPipelineViewportStateCreateInfo viewport_state{};
   viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
   viewport_state.viewportCount = 1;
@@ -47,13 +48,15 @@ bool graphics_pipeline_create(Context *context, Renderpass *renderpass,
   multisampling.alphaToOneEnable = VK_FALSE;
 
   VkPipelineDepthStencilStateCreateInfo depth_stencil{};
-  depth_stencil.sType =
-      VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depth_stencil.depthTestEnable = VK_TRUE;
-  depth_stencil.depthWriteEnable = VK_TRUE;
-  depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
-  depth_stencil.depthBoundsTestEnable = VK_FALSE;
-  depth_stencil.stencilTestEnable = VK_FALSE;
+  if (depth_test_enabled) {
+    depth_stencil.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depth_stencil.depthTestEnable = VK_TRUE;
+    depth_stencil.depthWriteEnable = VK_TRUE;
+    depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depth_stencil.depthBoundsTestEnable = VK_FALSE;
+    depth_stencil.stencilTestEnable = VK_FALSE;
+  }
 
   VkPipelineColorBlendAttachmentState color_blend_attachment_state{};
   color_blend_attachment_state.blendEnable = VK_TRUE;
@@ -90,7 +93,7 @@ bool graphics_pipeline_create(Context *context, Renderpass *renderpass,
 
   VkVertexInputBindingDescription binding_description;
   binding_description.binding = 0;
-  binding_description.stride = sizeof(vertex_3d);
+  binding_description.stride = stride;
   binding_description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
   VkPipelineVertexInputStateCreateInfo input{};
@@ -130,7 +133,7 @@ bool graphics_pipeline_create(Context *context, Renderpass *renderpass,
   info.pViewportState = &viewport_state;
   info.pRasterizationState = &rasterization;
   info.pMultisampleState = &multisampling;
-  info.pDepthStencilState = &depth_stencil;
+  info.pDepthStencilState = depth_test_enabled ? &depth_stencil : nullptr;
   info.pColorBlendState = &color_blend;
   info.pDynamicState = &dynamic_state;
   info.pTessellationState = nullptr;

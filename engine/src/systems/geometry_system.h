@@ -10,10 +10,12 @@ struct geometry_system_config {
 };
 
 struct geometry_config {
+  u32 vertex_size;
   u32 vertex_count;
-  vertex_3d *vertices;
+  ptr vertices;
+  u32 index_size;
   u32 index_count;
-  u32 *indices;
+  ptr indices;
   char name[Geometry::NAME_MAX_LENGTH];
   char material_name[Material::NAME_MAX_LENGTH];
 
@@ -36,6 +38,8 @@ Geometry *geometry_system_acquire(geometry_config config, bool auto_release);
 void geometry_system_release(Geometry *geometry);
 
 Geometry *geometry_system_get_default();
+
+Geometry *geometry_system_get_default_2d();
 
 } // namespace ns
 

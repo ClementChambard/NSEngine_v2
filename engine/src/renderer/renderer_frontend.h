@@ -26,9 +26,9 @@ bool renderer_create_material(Material *material);
 
 void renderer_destroy_material(Material *material);
 
-bool renderer_create_geometry(Geometry *geometry, u32 vertex_count,
-                              vertex_3d const *vertices, u32 index_count,
-                              u32 const *indices);
+bool renderer_create_geometry(Geometry *geometry, u32 vertex_size,
+                              u32 vertex_count, roptr vertices, u32 index_size,
+                              u32 index_count, roptr indices);
 
 void renderer_destroy_geometry(Geometry *geometry);
 

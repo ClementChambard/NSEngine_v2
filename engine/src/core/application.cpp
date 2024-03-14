@@ -64,6 +64,7 @@ struct application_state {
 
   // temp
   ns::Geometry *test_geometry;
+  ns::Geometry *test_2d_geometry;
 };
 
 static application_state *app_state;
@@ -234,8 +235,7 @@ bool application_create(game *game_inst) {
     return false;
   }
 
-  // temp
-  // app_state->test_geometry = ns::geometry_system_get_default();
+  // TEMP
   ns::geometry_config config = ns::geometry_config::plane(
       10.0f, 10.0f, 5, 5, 2.0f, 2.0f, "test geometry", "test_material");
   app_state->test_geometry = ns::geometry_system_acquire(config, true);
@@ -244,6 +244,29 @@ bool application_create(game *game_inst) {
            ns::mem_tag::ARRAY);
   ns::free(config.indices, sizeof(u32) * config.index_count,
            ns::mem_tag::ARRAY);
+
+  ns::geometry_config config2{};
+  config2.vertex_size = sizeof(ns::vertex_2d);
+  config2.vertex_count = 4;
+  config2.index_size = sizeof(u32);
+  config2.index_count = 6;
+  ns::string_cpy(config2.material_name, "test_ui_material");
+  ns::string_cpy(config2.name, "test_ui_geometry");
+
+  const f32 f = 512.0f;
+  ns::vertex_2d vertices[] = {
+      {{0, 0}, {0, 0}},
+      {{f, f}, {1, 1}},
+      {{0, f}, {0, 1}},
+      {{f, 0}, {1, 0}},
+  };
+  config2.vertices = vertices;
+
+  u32 indices[] = {2, 1, 0, 3, 0, 1};
+  config2.indices = indices;
+
+  app_state->test_2d_geometry = ns::geometry_system_acquire(config2, true);
+  // END TEMP
 
   if (!app_state->game_inst->initialize(app_state->game_inst)) {
     NS_FATAL("Game failed to initialize.");
@@ -301,6 +324,12 @@ bool application_run() {
     test_render.model = ns::mat4(1.0f);
     packet.geometry_count = 1;
     packet.geometries = &test_render;
+
+    ns::geometry_render_data test_ui_render;
+    test_ui_render.geometry = app_state->test_2d_geometry;
+    test_ui_render.model = ns::mat4(1.0f);
+    packet.ui_geometry_count = 1;
+    packet.ui_geometries = &test_ui_render;
 
     renderer_draw_frame(&packet);
 

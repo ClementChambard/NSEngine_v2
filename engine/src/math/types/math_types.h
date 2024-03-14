@@ -12,6 +12,11 @@ struct vertex_3d {
   vec2 texcoord;
 };
 
+struct vertex_2d {
+  vec2 position;
+  vec2 texcoord;
+};
+
 } // namespace ns
 
 #endif // MATH_TYPES_HEADER_INCLUDED

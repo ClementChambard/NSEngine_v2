@@ -1,7 +1,6 @@
-#ifndef VULKAN_OBJECT_SHADER_HEADER_INCLUDED
-#define VULKAN_OBJECT_SHADER_HEADER_INCLUDED
+#ifndef VULKAN_MATERIAL_SHADER_HEADER_INCLUDED
+#define VULKAN_MATERIAL_SHADER_HEADER_INCLUDED
 
-#include "../../renderer_types.inl"
 #include "../vulkan_types.inl"
 
 namespace ns::vulkan {
@@ -29,4 +28,4 @@ void material_shader_release_resources(Context *context, MaterialShader *shader,
 
 } // namespace ns::vulkan
 
-#endif // VULKAN_OBJECT_SHADER_HEADER_INCLUDED
+#endif // VULKAN_MATERIAL_SHADER_HEADER_INCLUDED

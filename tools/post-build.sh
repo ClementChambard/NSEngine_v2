@@ -27,5 +27,7 @@ compile_shader() {
 # compile all shaders
 echo "Compiling shaders..."
 
+# TODO: auto add shaders
 compile_shader "Builtin" "MaterialShader"
+compile_shader "Builtin" "UIShader"
 # ...

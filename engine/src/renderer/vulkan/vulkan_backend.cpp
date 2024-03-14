@@ -6,11 +6,10 @@
 #include "../../core/ns_string.h"
 #include "../../math/types/math_types.h"
 #include "./shaders/vulkan_material_shader.h"
+#include "./shaders/vulkan_ui_shader.h"
 #include "./vulkan_buffer.h"
 #include "./vulkan_command_buffer.h"
 #include "./vulkan_device.h"
-#include "./vulkan_fence.h"
-#include "./vulkan_framebuffer.h"
 #include "./vulkan_image.h"
 #include "./vulkan_platform.h"
 #include "./vulkan_renderpass.h"
@@ -35,8 +34,7 @@ i32 find_memory_index(u32 type_filter, u32 property_flags);
 bool create_buffers(Context *context);
 
 void create_command_buffers(renderer_backend *backend);
-void regenerate_framebuffers(renderer_backend *backend, Swapchain *swapchain,
-                             Renderpass *renderpass);
+void regenerate_framebuffers();
 bool recreate_swapchain(renderer_backend *backend);
 
 void upload_data_range(Context *context, VkCommandPool pool, VkFence fence,
@@ -175,12 +173,18 @@ bool backend_initialize(renderer_backend *backend, cstr application_name) {
   swapchain_create(&context, framebuffer_width, framebuffer_height,
                    &context.swapchain);
 
-  renderpass_create(&context, &context.main_renderpass, 0, 0, framebuffer_width,
-                    framebuffer_height, 0.0f, 0.0f, 0.2f, 1.0f, 1.0f, 0);
+  renderpass_create(&context, &context.main_renderpass,
+                    {0.0f, 0.0f, static_cast<f32>(framebuffer_width),
+                     static_cast<f32>(framebuffer_height)},
+                    {0.0f, 0.0f, 0.2f, 1.0f}, 1.0f, 0, ClearFlags::ALL, false,
+                    true);
 
-  context.swapchain.framebuffers.resize(context.swapchain.image_count);
-  regenerate_framebuffers(backend, &context.swapchain,
-                          &context.main_renderpass);
+  renderpass_create(&context, &context.ui_renderpass,
+                    {0.0f, 0.0f, static_cast<f32>(framebuffer_width),
+                     static_cast<f32>(framebuffer_height)},
+                    {}, 1.0f, 0, ClearFlags::NONE, true, false);
+
+  regenerate_framebuffers();
 
   create_command_buffers(backend);
 
@@ -188,7 +192,6 @@ bool backend_initialize(renderer_backend *backend, cstr application_name) {
       context.swapchain.max_frames_in_flight);
   context.queue_complete_semaphores.resize(
       context.swapchain.max_frames_in_flight);
-  context.in_flight_fences.resize(context.swapchain.max_frames_in_flight);
 
   for (u8 i = 0; i < context.swapchain.max_frames_in_flight; i++) {
     VkSemaphoreCreateInfo semaphore_info{};
@@ -197,16 +200,24 @@ bool backend_initialize(renderer_backend *backend, cstr application_name) {
                       &context.image_available_semaphores[i]);
     vkCreateSemaphore(context.device, &semaphore_info, context.allocator,
                       &context.queue_complete_semaphores[i]);
-    fence_create(&context, true, &context.in_flight_fences[i]);
+    VkFenceCreateInfo fence_info{};
+    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    VK_CHECK(vkCreateFence(context.device, &fence_info, context.allocator,
+                           &context.in_flight_fences[i]));
   }
 
-  context.images_in_flight.resize(context.swapchain.image_count);
   for (u32 i = 0; i < context.swapchain.image_count; i++) {
     context.images_in_flight[i] = nullptr;
   }
 
   if (!material_shader_create(&context, &context.material_shader)) {
     NS_ERROR("Error loading built-in basic_lighting shader.");
+    return false;
+  }
+
+  if (!ui_shader_create(&context, &context.ui_shader)) {
+    NS_ERROR("Error loading built-in ui shader.");
     return false;
   }
 
@@ -226,6 +237,7 @@ void backend_shutdown(renderer_backend * /* backend */) {
   buffer_destroy(&context, &context.object_vertex_buffer);
   buffer_destroy(&context, &context.object_index_buffer);
 
+  ui_shader_destroy(&context, &context.ui_shader);
   material_shader_destroy(&context, &context.material_shader);
 
   for (u8 i = 0; i < context.swapchain.max_frames_in_flight; i++) {
@@ -237,12 +249,11 @@ void backend_shutdown(renderer_backend * /* backend */) {
       vkDestroySemaphore(context.device, context.queue_complete_semaphores[i],
                          context.allocator);
     }
-    fence_destroy(&context, &context.in_flight_fences[i]);
+    vkDestroyFence(context.device, context.in_flight_fences[i],
+                   context.allocator);
   }
   vector<VkSemaphore>().swap(context.image_available_semaphores);
   vector<VkSemaphore>().swap(context.queue_complete_semaphores);
-  vector<Fence>().swap(context.in_flight_fences);
-  vector<Fence *>().swap(context.images_in_flight);
 
   for (u32 i = 0; i < context.swapchain.image_count; i++) {
     if (context.graphics_command_buffers[i].handle) {
@@ -253,10 +264,13 @@ void backend_shutdown(renderer_backend * /* backend */) {
   vector<CommandBuffer>().swap(context.graphics_command_buffers);
 
   for (u32 i = 0; i < context.swapchain.image_count; i++) {
-    framebuffer_destroy(&context, &context.swapchain.framebuffers[i]);
+    vkDestroyFramebuffer(context.device, context.world_framebuffers[i],
+                         context.allocator);
+    vkDestroyFramebuffer(context.device, context.swapchain.framebuffers[i],
+                         context.allocator);
   }
-  vector<Framebuffer>().swap(context.swapchain.framebuffers);
 
+  renderpass_destroy(&context, &context.ui_renderpass);
   renderpass_destroy(&context, &context.main_renderpass);
 
   NS_DEBUG("Destroying Vulkan swapchain...");
@@ -327,9 +341,13 @@ bool backend_begin_frame(renderer_backend *backend, f32 delta_time) {
     return false;
   }
 
-  if (!fence_wait(&context, &context.in_flight_fences[context.current_frame],
-                  UINT64_MAX)) {
-    NS_WARN("In-flight fence wait failure!");
+  VkResult result = vkWaitForFences(
+      context.device, 1, &context.in_flight_fences[context.current_frame], true,
+      UINT64_MAX);
+  if (!result_is_success(result)) {
+    NS_ERROR("in flight fence wait failure! error: '%s'",
+             result_string(result, true));
+    return false;
   }
 
   if (!swapchain_acquire_next_image_index(
@@ -365,18 +383,17 @@ bool backend_begin_frame(renderer_backend *backend, f32 delta_time) {
   vkCmdSetViewport(command_buffer->handle, 0, 1, &viewport);
   vkCmdSetScissor(command_buffer->handle, 0, 1, &scissor);
 
-  context.main_renderpass.w = framebuffer_width;
-  context.main_renderpass.h = framebuffer_height;
-
-  renderpass_begin(command_buffer, &context.main_renderpass,
-                   context.swapchain.framebuffers[context.image_index].handle);
+  context.main_renderpass.render_area.z = framebuffer_width;
+  context.main_renderpass.render_area.w = framebuffer_height;
+  context.ui_renderpass.render_area.z = framebuffer_width;
+  context.ui_renderpass.render_area.w = framebuffer_height;
 
   return true;
 }
 
-void backend_update_global_state(mat4 projection, mat4 view,
-                                 vec3 /*view_position*/, vec4 /*ambient_color*/,
-                                 i32 /*mode*/) {
+void backend_update_global_world_state(mat4 projection, mat4 view,
+                                       vec3 /*view_position*/,
+                                       vec4 /*ambient_color*/, i32 /*mode*/) {
   material_shader_use(&context, &context.material_shader);
 
   context.material_shader.global_ubo.projection = projection;
@@ -386,23 +403,37 @@ void backend_update_global_state(mat4 projection, mat4 view,
                                       context.frame_delta_time);
 }
 
+void backend_update_global_ui_state(mat4 projection, mat4 view, i32 /*mode*/) {
+  ui_shader_use(&context, &context.ui_shader);
+
+  context.ui_shader.global_ubo.projection = projection;
+  context.ui_shader.global_ubo.view = view;
+
+  ui_shader_update_global_state(&context, &context.ui_shader,
+                                context.frame_delta_time);
+}
+
 bool backend_end_frame(renderer_backend * /* backend */, f32 /* delta_time */) {
   CommandBuffer *command_buffer =
       &context.graphics_command_buffers[context.image_index];
 
-  renderpass_end(command_buffer, &context.main_renderpass);
-
   command_buffer_end(command_buffer);
 
   if (context.images_in_flight[context.image_index] != nullptr) {
-    fence_wait(&context, context.images_in_flight[context.image_index],
-               UINT64_MAX);
+    VkResult result = vkWaitForFences(
+        context.device, 1, context.images_in_flight[context.image_index], true,
+        UINT64_MAX);
+    if (!result_is_success(result)) {
+      NS_FATAL("vkWaitForFences - error: '%s'", result_string(result, true));
+      return false;
+    }
   }
 
   context.images_in_flight[context.image_index] =
       &context.in_flight_fences[context.current_frame];
 
-  fence_reset(&context, &context.in_flight_fences[context.current_frame]);
+  VK_CHECK(vkResetFences(context.device, 1,
+                         &context.in_flight_fences[context.current_frame]));
 
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -420,7 +451,7 @@ bool backend_end_frame(renderer_backend * /* backend */, f32 /* delta_time */) {
 
   VkResult result =
       vkQueueSubmit(context.device.graphics_queue, 1, &submit_info,
-                    context.in_flight_fences[context.current_frame].handle);
+                    context.in_flight_fences[context.current_frame]);
   if (result != VK_SUCCESS) {
     NS_ERROR("vkQueueSubmit failed with result '%s'",
              result_string(result, true));
@@ -490,20 +521,42 @@ void create_command_buffers(renderer_backend * /*backend*/) {
   NS_DEBUG("Vulkan command buffers created.");
 }
 
-void regenerate_framebuffers(renderer_backend * /*backend*/,
-                             Swapchain *swapchain, Renderpass *renderpass) {
-  for (u32 i = 0; i < swapchain->image_count; i++) {
-    u32 attachment_count = 2;
-    VkImageView attachments[] = {
-        swapchain->views[i],
-        swapchain->depth_attachment.view,
+void regenerate_framebuffers() {
+  for (u32 i = 0; i < context.swapchain.image_count; i++) {
+    VkImageView world_attachments[2] = {
+        context.swapchain.views[i], context.swapchain.depth_attachment.view};
+
+    VkFramebufferCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    info.renderPass = context.main_renderpass;
+    info.attachmentCount = 2;
+    info.pAttachments = world_attachments;
+    info.width =
+        context.device.swapchain_support.capabilities.currentExtent.width;
+    info.height =
+        context.device.swapchain_support.capabilities.currentExtent.height;
+    info.layers = 1;
+
+    VK_CHECK(vkCreateFramebuffer(context.device, &info, context.allocator,
+                                 &context.world_framebuffers[i]));
+
+    VkImageView ui_attachments[1] = {
+        context.swapchain.views[i],
     };
 
-    framebuffer_create(
-        &context, renderpass,
-        context.device.swapchain_support.capabilities.currentExtent.width,
-        context.device.swapchain_support.capabilities.currentExtent.height,
-        attachment_count, attachments, &context.swapchain.framebuffers[i]);
+    VkFramebufferCreateInfo depth_info{};
+    depth_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    depth_info.renderPass = context.ui_renderpass;
+    depth_info.attachmentCount = 1;
+    depth_info.pAttachments = ui_attachments;
+    depth_info.width =
+        context.device.swapchain_support.capabilities.currentExtent.width;
+    depth_info.height =
+        context.device.swapchain_support.capabilities.currentExtent.height;
+    depth_info.layers = 1;
+
+    VK_CHECK(vkCreateFramebuffer(context.device, &depth_info, context.allocator,
+                                 &context.swapchain.framebuffers[i]));
   }
 }
 
@@ -534,15 +587,16 @@ bool recreate_swapchain(renderer_backend *backend) {
   swapchain_recreate(&context, cached_framebuffer_width,
                      cached_framebuffer_height, &context.swapchain);
 
-  u32 framebuffer_width = context.device.swapchain_support.capabilities
-                              .currentExtent.width; // cached_framebuffer_width;
-  u32 framebuffer_height =
-      context.device.swapchain_support.capabilities.currentExtent
-          .height; // cached_framebuffer_height;
-  context.main_renderpass.x = 0;
-  context.main_renderpass.y = 0;
-  context.main_renderpass.w = framebuffer_width;
-  context.main_renderpass.h = framebuffer_height;
+  f32 framebuffer_width =
+      static_cast<f32>(context.device.swapchain_support.capabilities
+                           .currentExtent.width); // cached_framebuffer_width;
+  f32 framebuffer_height =
+      static_cast<f32>(context.device.swapchain_support.capabilities
+                           .currentExtent.height); // cached_framebuffer_height;
+  context.main_renderpass.render_area = {0, 0, framebuffer_width,
+                                         framebuffer_height};
+  context.ui_renderpass.render_area = {0, 0, framebuffer_width,
+                                       framebuffer_height};
   cached_framebuffer_width = 0;
   cached_framebuffer_height = 0;
 
@@ -552,11 +606,13 @@ bool recreate_swapchain(renderer_backend *backend) {
   for (u32 i = 0; i < context.swapchain.image_count; i++) {
     command_buffer_free(&context, context.device.graphics_command_pool,
                         &context.graphics_command_buffers[i]);
-    framebuffer_destroy(&context, &context.swapchain.framebuffers[i]);
+    vkDestroyFramebuffer(context.device, context.world_framebuffers[i],
+                         context.allocator);
+    vkDestroyFramebuffer(context.device, context.swapchain.framebuffers[i],
+                         context.allocator);
   }
 
-  regenerate_framebuffers(backend, &context.swapchain,
-                          &context.main_renderpass);
+  regenerate_framebuffers();
 
   create_command_buffers(backend);
 
@@ -692,10 +748,24 @@ bool backend_create_material(Material *material) {
     NS_ERROR("vulkan::renderer_create_material - material is null");
     return false;
   }
-  if (!material_shader_acquire_resources(&context, &context.material_shader,
-                                         material)) {
-    NS_ERROR("vulkan::renderer_create_material - "
-             "material_shader_acquire_resources failed");
+  switch (material->type) {
+  case MaterialType::WORLD:
+    if (!material_shader_acquire_resources(&context, &context.material_shader,
+                                           material)) {
+      NS_ERROR("vulkan::renderer_create_material - "
+               "material_shader_acquire_resources failed");
+      return false;
+    }
+    break;
+  case MaterialType::UI:
+    if (!ui_shader_acquire_resources(&context, &context.ui_shader, material)) {
+      NS_ERROR("vulkan::renderer_create_material - "
+               "ui_shader_acquire_resources failed");
+      return false;
+    }
+    break;
+  default:
+    NS_ERROR("vulkan::renderer_create_material - unknown material type");
     return false;
   }
   NS_TRACE("Renderer: material created.");
@@ -712,13 +782,24 @@ void backend_destroy_material(Material *material) {
         "vulkan::renderer_destroy_material - material has invalid internal id");
     return;
   }
-  material_shader_release_resources(&context, &context.material_shader,
-                                    material);
+
+  switch (material->type) {
+  case MaterialType::WORLD:
+    material_shader_release_resources(&context, &context.material_shader,
+                                      material);
+    break;
+  case MaterialType::UI:
+    ui_shader_release_resources(&context, &context.ui_shader, material);
+    break;
+  default:
+    NS_WARN("vulkan::renderer_destroy_material - unknown material type");
+    return;
+  }
 }
 
-bool backend_create_geometry(Geometry *geometry, u32 vertex_count,
-                             vertex_3d const *vertices, u32 index_count,
-                             u32 const *indices) {
+bool backend_create_geometry(Geometry *geometry, u32 vertex_size,
+                             u32 vertex_count, roptr vertices, u32 index_size,
+                             u32 index_count, roptr indices) {
   if (!vertex_count || !vertices) {
     NS_ERROR("vulkan::renderer_create_geometry - vertex_count or vertices "
              "is null");
@@ -736,8 +817,8 @@ bool backend_create_geometry(Geometry *geometry, u32 vertex_count,
     old_range.index_count = internal_data->index_count;
     old_range.vertex_buffer_offset = internal_data->vertex_buffer_offset;
     old_range.vertex_count = internal_data->vertex_count;
-    old_range.index_size = internal_data->index_size;
-    old_range.vertex_size = internal_data->vertex_size;
+    old_range.index_element_size = internal_data->index_element_size;
+    old_range.vertex_element_size = internal_data->vertex_element_size;
   } else {
     for (u32 i = 0; i < Context::MAX_GEOMETRY_COUNT; i++) {
       if (context.geometries[i].id == INVALID_ID) {
@@ -759,20 +840,20 @@ bool backend_create_geometry(Geometry *geometry, u32 vertex_count,
 
   internal_data->vertex_buffer_offset = context.geometry_vertex_offset;
   internal_data->vertex_count = vertex_count;
-  internal_data->vertex_size = sizeof(vertex_3d) * vertex_count;
+  internal_data->vertex_element_size = vertex_size;
+  u32 total_size = vertex_size * vertex_count;
   upload_data_range(&context, pool, 0, queue, &context.object_vertex_buffer,
-                    internal_data->vertex_buffer_offset,
-                    internal_data->vertex_size, vertices);
-  context.geometry_vertex_offset += internal_data->vertex_size;
+                    internal_data->vertex_buffer_offset, total_size, vertices);
+  context.geometry_vertex_offset += total_size;
 
   if (index_count && indices) {
     internal_data->index_buffer_offset = context.geometry_index_offset;
     internal_data->index_count = index_count;
-    internal_data->index_size = sizeof(u32) * index_count;
+    internal_data->index_element_size = index_size;
+    total_size = index_size * index_count;
     upload_data_range(&context, pool, 0, queue, &context.object_index_buffer,
-                      internal_data->index_buffer_offset,
-                      internal_data->index_size, indices);
-    context.geometry_index_offset += internal_data->index_size;
+                      internal_data->index_buffer_offset, total_size, indices);
+    context.geometry_index_offset += total_size;
   }
 
   if (internal_data->generation == INVALID_ID) {
@@ -783,10 +864,12 @@ bool backend_create_geometry(Geometry *geometry, u32 vertex_count,
 
   if (is_reupload) {
     free_data_range(&context.object_vertex_buffer,
-                    old_range.vertex_buffer_offset, old_range.vertex_size);
-    if (old_range.index_size > 0) {
+                    old_range.vertex_buffer_offset,
+                    old_range.vertex_element_size * old_range.vertex_count);
+    if (old_range.index_count > 0) {
       free_data_range(&context.object_index_buffer,
-                      old_range.index_buffer_offset, old_range.index_size);
+                      old_range.index_buffer_offset,
+                      old_range.index_element_size * old_range.index_count);
     }
   }
 
@@ -800,13 +883,13 @@ void backend_destroy_geometry(Geometry *geometry) {
   vkDeviceWaitIdle(context.device);
   GeometryData *internal_data = &context.geometries[geometry->internal_id];
 
-  free_data_range(&context.object_vertex_buffer,
-                  internal_data->vertex_buffer_offset,
-                  internal_data->vertex_size);
-  if (internal_data->index_size > 0) {
-    free_data_range(&context.object_index_buffer,
-                    internal_data->index_buffer_offset,
-                    internal_data->index_size);
+  free_data_range(
+      &context.object_vertex_buffer, internal_data->vertex_buffer_offset,
+      internal_data->vertex_element_size * internal_data->vertex_count);
+  if (internal_data->index_count > 0) {
+    free_data_range(
+        &context.object_index_buffer, internal_data->index_buffer_offset,
+        internal_data->index_element_size * internal_data->index_count);
   }
 
   mem_zero(internal_data, sizeof(GeometryData));
@@ -823,16 +906,25 @@ void backend_draw_geometry(geometry_render_data data) {
   VkCommandBuffer command_buffer =
       context.graphics_command_buffers[context.image_index];
 
-  // TODO(ClementChambard): Check if needed
-  material_shader_use(&context, &context.material_shader);
-
-  material_shader_set_model(&context, &context.material_shader, data.model);
+  Material *m;
   if (data.geometry->material) {
-    material_shader_apply_material(&context, &context.material_shader,
-                                   data.geometry->material);
+    m = data.geometry->material;
   } else {
-    material_shader_apply_material(&context, &context.material_shader,
-                                   material_system_get_default());
+    m = material_system_get_default();
+  }
+
+  switch (m->type) {
+  case MaterialType::WORLD:
+    material_shader_set_model(&context, &context.material_shader, data.model);
+    material_shader_apply_material(&context, &context.material_shader, m);
+    break;
+  case MaterialType::UI:
+    ui_shader_set_model(&context, &context.ui_shader, data.model);
+    ui_shader_apply_material(&context, &context.ui_shader, m);
+    break;
+  default:
+    NS_ERROR("Unknown material type");
+    break;
   }
 
   VkDeviceSize offsets[1] = {buffer_data->vertex_buffer_offset};
@@ -847,6 +939,53 @@ void backend_draw_geometry(geometry_render_data data) {
   } else {
     vkCmdDraw(command_buffer, buffer_data->vertex_count, 1, 0, 0);
   }
+}
+
+bool backend_begin_renderpass(renderer_backend * /*backend*/,
+                              u8 renderpass_id) {
+  Renderpass *renderpass = nullptr;
+  VkFramebuffer framebuffer = VK_NULL_HANDLE;
+  CommandBuffer *command_buffer =
+      &context.graphics_command_buffers[context.image_index];
+
+  switch (static_cast<builtin_renderpass>(renderpass_id)) {
+  case builtin_renderpass::WORLD:
+    renderpass = &context.main_renderpass;
+    framebuffer = context.world_framebuffers[context.image_index];
+    break;
+  case builtin_renderpass::UI:
+    renderpass = &context.ui_renderpass;
+    framebuffer = context.swapchain.framebuffers[context.image_index];
+    break;
+  }
+
+  renderpass_begin(command_buffer, renderpass, framebuffer);
+
+  // use appropriate shader
+  switch (static_cast<builtin_renderpass>(renderpass_id)) {
+  case builtin_renderpass::WORLD:
+    material_shader_use(&context, &context.material_shader);
+    break;
+  case builtin_renderpass::UI:
+    ui_shader_use(&context, &context.ui_shader);
+    break;
+  }
+
+  return true;
+}
+
+bool backend_end_renderpass(renderer_backend * /*backend*/, u8 renderpass_id) {
+  CommandBuffer *command_buffer =
+      &context.graphics_command_buffers[context.image_index];
+  switch (static_cast<builtin_renderpass>(renderpass_id)) {
+  case builtin_renderpass::WORLD:
+    renderpass_end(command_buffer, &context.main_renderpass);
+    break;
+  case builtin_renderpass::UI:
+    renderpass_end(command_buffer, &context.ui_renderpass);
+    break;
+  }
+  return true;
 }
 
 } // namespace ns::vulkan

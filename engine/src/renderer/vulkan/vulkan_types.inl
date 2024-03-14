@@ -74,12 +74,38 @@ struct Image {
   operator VkImage() const { return handle; }
 };
 
+enum class ClearFlags : u8 {
+  NONE = 0x0,
+  COLOR = 0x1,
+  DEPTH = 0x2,
+  COLOR_AND_DEPTH = 0x3,
+  STENCIL = 0x4,
+  COLOR_AND_STENCIL = 0x5,
+  DEPTH_AND_STENCIL = 0x6,
+  ALL = 0x7,
+};
+
+inline ClearFlags operator|(ClearFlags lhs, ClearFlags rhs) {
+  return static_cast<ClearFlags>(static_cast<u8>(lhs) | static_cast<u8>(rhs));
+}
+
+inline ClearFlags operator&(ClearFlags lhs, ClearFlags rhs) {
+  return static_cast<ClearFlags>(static_cast<u8>(lhs) & static_cast<u8>(rhs));
+}
+
+inline ClearFlags operator^(ClearFlags lhs, ClearFlags rhs) {
+  return static_cast<ClearFlags>(static_cast<u8>(lhs) ^ static_cast<u8>(rhs));
+}
+
 struct Renderpass {
   VkRenderPass handle = VK_NULL_HANDLE;
-  f32 x, y, w, h;
-  f32 r, g, b, a;
-  f32 depth;
-  u32 stencil;
+  vec4 render_area;
+  vec4 clear_color;
+  f32 clear_depth;
+  u32 clear_stencil;
+  ClearFlags clear_flags;
+  bool has_prev_pass;
+  bool has_next_pass;
 
   enum class State {
     READY,
@@ -93,15 +119,6 @@ struct Renderpass {
   operator VkRenderPass() const { return handle; }
 };
 
-struct Framebuffer {
-  VkFramebuffer handle;
-  u32 attachment_count;
-  VkImageView *attachments;
-  Renderpass *renderpass;
-
-  operator VkFramebuffer() const { return handle; }
-};
-
 struct Swapchain {
   VkSurfaceFormatKHR image_format;
   u8 max_frames_in_flight;
@@ -110,7 +127,7 @@ struct Swapchain {
   VkImage *images;
   VkImageView *views;
   Image depth_attachment;
-  vector<Framebuffer> framebuffers;
+  VkFramebuffer framebuffers[3];
 
   operator VkSwapchainKHR() const { return handle; }
 };
@@ -128,13 +145,6 @@ struct CommandBuffer {
   } state = State::NOT_ALLOCATED;
 
   operator VkCommandBuffer() const { return handle; }
-};
-
-struct Fence {
-  VkFence handle;
-  bool is_signaled;
-
-  operator VkFence() const { return handle; }
 };
 
 struct ShaderStage {
@@ -162,13 +172,30 @@ struct GeometryData {
   u32 generation;
   u32 vertex_count;
   u32 vertex_buffer_offset;
-  u32 vertex_size;
+  u32 vertex_element_size;
   u32 index_count;
   u32 index_buffer_offset;
-  u32 index_size;
+  u32 index_element_size;
 };
 
 struct MaterialShader {
+  struct GlobalUBO {
+    mat4 projection;
+    mat4 view;
+    mat4 m_reserved0;
+    mat4 m_reserved1;
+  };
+
+  struct InstanceUBO {
+    vec4 diffuse_color;
+    vec4 v_reserved0;
+    vec4 v_reserved1;
+    vec4 v_reserved2;
+    mat4 m_reserved3;
+    mat4 m_reserved4;
+    mat4 m_reserved5;
+  };
+
   static constexpr usize STAGE_COUNT = 2;
   static constexpr usize DESCRIPTOR_COUNT = 2;
   static constexpr usize SAMPLER_COUNT = 1;
@@ -185,7 +212,7 @@ struct MaterialShader {
   VkDescriptorSetLayout global_descriptor_set_layout;
   VkDescriptorSet global_descriptor_sets[3];
 
-  global_uniform_object global_ubo;
+  GlobalUBO global_ubo;
 
   Buffer global_uniform_buffer;
 
@@ -197,6 +224,56 @@ struct MaterialShader {
   TextureUse sampler_uses[SAMPLER_COUNT];
 
   InstanceState instance_states[MAX_MATERIAL_COUNT];
+
+  Pipeline pipeline;
+};
+
+struct UiShader {
+  struct GlobalUBO {
+    mat4 projection;
+    mat4 view;
+    mat4 m_reserved0;
+    mat4 m_reserved1;
+  };
+
+  struct InstanceUBO {
+    vec4 diffuse_color;
+    vec4 v_reserved0;
+    vec4 v_reserved1;
+    vec4 v_reserved2;
+    mat4 m_reserved3;
+    mat4 m_reserved4;
+    mat4 m_reserved5;
+  };
+
+  static constexpr usize STAGE_COUNT = 2;
+  static constexpr usize DESCRIPTOR_COUNT = 2;
+  static constexpr usize SAMPLER_COUNT = 1;
+  static constexpr usize MAX_UI_COUNT = 1024;
+
+  struct InstanceState {
+    VkDescriptorSet descriptor_sets[3];
+    DescriptorState descriptor_states[DESCRIPTOR_COUNT];
+  };
+
+  ShaderStage stages[STAGE_COUNT];
+
+  VkDescriptorPool global_descriptor_pool;
+  VkDescriptorSetLayout global_descriptor_set_layout;
+  VkDescriptorSet global_descriptor_sets[3];
+
+  GlobalUBO global_ubo;
+
+  Buffer global_uniform_buffer;
+
+  VkDescriptorPool object_descriptor_pool;
+  VkDescriptorSetLayout object_descriptor_set_layout;
+  Buffer object_uniform_buffer;
+  u32 object_uniform_buffer_index;
+
+  TextureUse sampler_uses[SAMPLER_COUNT];
+
+  InstanceState instance_states[MAX_UI_COUNT];
 
   Pipeline pipeline;
 };
@@ -222,6 +299,7 @@ struct Context {
 
   Swapchain swapchain;
   Renderpass main_renderpass;
+  Renderpass ui_renderpass;
 
   Buffer object_vertex_buffer;
   Buffer object_index_buffer;
@@ -231,8 +309,8 @@ struct Context {
   vector<VkSemaphore> image_available_semaphores;
   vector<VkSemaphore> queue_complete_semaphores;
   u32 in_flight_fence_count;
-  vector<Fence> in_flight_fences;
-  vector<Fence *> images_in_flight;
+  VkFence in_flight_fences[2];
+  VkFence *images_in_flight[3];
 
   u32 image_index;
   u32 current_frame;
@@ -240,11 +318,14 @@ struct Context {
   bool recreating_swapchain;
 
   MaterialShader material_shader;
+  UiShader ui_shader;
 
   usize geometry_vertex_offset;
   usize geometry_index_offset;
 
   GeometryData geometries[MAX_GEOMETRY_COUNT];
+
+  VkFramebuffer world_framebuffers[3];
 
   i32 (*find_memory_index)(u32 type_filter, u32 property_flags);
 };

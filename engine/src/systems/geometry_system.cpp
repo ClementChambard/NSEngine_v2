@@ -17,12 +17,13 @@ struct geometry_reference {
 struct geometry_system_state {
   geometry_system_config config;
   Geometry default_geometry;
+  Geometry default_2d_geometry;
   geometry_reference *registered_geometries;
 };
 
 static geometry_system_state *state_ptr = nullptr;
 
-bool create_default_geometry(geometry_system_state *state);
+bool create_default_geometries(geometry_system_state *state);
 bool create_geometry(geometry_system_state *state, geometry_config config,
                      Geometry *g);
 void destroy_geometry(geometry_system_state *state, Geometry *g);
@@ -54,8 +55,8 @@ bool geometry_system_initialize(u64 *memory_requirement, ptr state,
     state_ptr->registered_geometries[i].geometry.generation = INVALID_ID;
   }
 
-  if (!create_default_geometry(state_ptr)) {
-    NS_FATAL("Could not create default geometry");
+  if (!create_default_geometries(state_ptr)) {
+    NS_FATAL("Could not create default geometries");
     return false;
   }
   return true;
@@ -125,6 +126,14 @@ Geometry *geometry_system_get_default() {
   return &state_ptr->default_geometry;
 }
 
+Geometry *geometry_system_get_default_2d() {
+  if (state_ptr == nullptr) {
+    NS_FATAL("geometry_system_get_default_2d - State pointer is null");
+    return nullptr;
+  }
+  return &state_ptr->default_2d_geometry;
+}
+
 geometry_config geometry_config::plane(f32 width, f32 height,
                                        u32 x_segment_count, u32 y_segment_count,
                                        f32 tile_x, f32 tile_y, cstr name,
@@ -156,9 +165,11 @@ geometry_config geometry_config::plane(f32 width, f32 height,
   }
 
   geometry_config config;
+  config.vertex_size = sizeof(vertex_3d);
   config.vertex_count = x_segment_count * y_segment_count * 4;
   config.vertices = reinterpret_cast<vertex_3d *>(
       ns::alloc(sizeof(vertex_3d) * config.vertex_count, mem_tag::ARRAY));
+  config.index_size = sizeof(u32);
   config.index_count = x_segment_count * y_segment_count * 6;
   config.indices = reinterpret_cast<u32 *>(
       ns::alloc(sizeof(u32) * config.index_count, mem_tag::ARRAY));
@@ -179,10 +190,11 @@ geometry_config geometry_config::plane(f32 width, f32 height,
       f32 max_uvy = ((y + 1) / static_cast<f32>(y_segment_count)) * tile_y;
 
       u32 v_offset = ((y * x_segment_count) + x) * 4;
-      vertex_3d *v0 = &config.vertices[v_offset + 0];
-      vertex_3d *v1 = &config.vertices[v_offset + 1];
-      vertex_3d *v2 = &config.vertices[v_offset + 2];
-      vertex_3d *v3 = &config.vertices[v_offset + 3];
+      vertex_3d *vertices = reinterpret_cast<vertex_3d *>(config.vertices);
+      vertex_3d *v0 = &vertices[v_offset + 0];
+      vertex_3d *v1 = &vertices[v_offset + 1];
+      vertex_3d *v2 = &vertices[v_offset + 2];
+      vertex_3d *v3 = &vertices[v_offset + 3];
 
       v0->position = {min_x, min_y, 0.0f};
       v0->texcoord = {min_uvx, min_uvy};
@@ -194,12 +206,13 @@ geometry_config geometry_config::plane(f32 width, f32 height,
       v3->texcoord = {max_uvx, min_uvy};
 
       u32 i_offset = ((y * x_segment_count) + x) * 6;
-      config.indices[i_offset + 0] = v_offset + 0;
-      config.indices[i_offset + 1] = v_offset + 1;
-      config.indices[i_offset + 2] = v_offset + 2;
-      config.indices[i_offset + 3] = v_offset + 0;
-      config.indices[i_offset + 4] = v_offset + 3;
-      config.indices[i_offset + 5] = v_offset + 1;
+      u32 *indices = reinterpret_cast<u32 *>(config.indices);
+      indices[i_offset + 0] = v_offset + 0;
+      indices[i_offset + 1] = v_offset + 1;
+      indices[i_offset + 2] = v_offset + 2;
+      indices[i_offset + 3] = v_offset + 0;
+      indices[i_offset + 4] = v_offset + 3;
+      indices[i_offset + 5] = v_offset + 1;
     }
   }
 
@@ -221,7 +234,8 @@ geometry_config geometry_config::plane(f32 width, f32 height,
 
 bool create_geometry(geometry_system_state *state, geometry_config config,
                      Geometry *g) {
-  if (!renderer_create_geometry(g, config.vertex_count, config.vertices,
+  if (!renderer_create_geometry(g, config.vertex_size, config.vertex_count,
+                                config.vertices, config.index_size,
                                 config.index_count, config.indices)) {
     state->registered_geometries[g->id].reference_count = 0;
     state->registered_geometries[g->id].auto_release = false;
@@ -255,7 +269,7 @@ void destroy_geometry(geometry_system_state * /*state*/, Geometry *g) {
   }
 }
 
-bool create_default_geometry(geometry_system_state *state) {
+bool create_default_geometries(geometry_system_state *state) {
   vertex_3d verts[4];
   mem_zero(verts, sizeof(verts));
 
@@ -272,13 +286,35 @@ bool create_default_geometry(geometry_system_state *state) {
 
   u32 indices[6] = {0, 1, 2, 0, 3, 1};
 
-  if (!renderer_create_geometry(&state->default_geometry, 4, verts, 6,
-                                indices)) {
+  if (!renderer_create_geometry(&state->default_geometry, sizeof(vertex_3d), 4,
+                                verts, sizeof(u32), 6, indices)) {
     NS_FATAL("Failed to create default geometry.");
     return false;
   }
 
   state->default_geometry.material = material_system_get_default();
+
+  vertex_2d verts2[4];
+  mem_zero(verts2, sizeof(verts2));
+
+  verts2[0].position = {-0.5f * f, -0.5f * f};
+  verts2[0].texcoord = {0.0f, 0.0f};
+  verts2[1].position = {0.5f * f, 0.5f * f};
+  verts2[1].texcoord = {1.0f, 1.0f};
+  verts2[2].position = {-0.5f * f, 0.5f * f};
+  verts2[2].texcoord = {0.0f, 1.0f};
+  verts2[3].position = {0.5f * f, -0.5f * f};
+  verts2[3].texcoord = {1.0f, 0.0f};
+
+  u32 indices2[6] = {2, 1, 0, 3, 0, 1};
+
+  if (!renderer_create_geometry(&state->default_2d_geometry, sizeof(vertex_2d),
+                                4, verts2, sizeof(u32), 6, indices2)) {
+    NS_FATAL("Failed to create default geometry.");
+    return false;
+  }
+
+  state->default_2d_geometry.material = material_system_get_default();
 
   return true;
 }

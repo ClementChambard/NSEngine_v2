@@ -5,6 +5,7 @@
 #include "../../core/ns_string.h"
 #include "../../systems/resource_system.h"
 #include "../resource_types.h"
+#include "./loader_utils.h"
 
 #include "../../platform/filesystem.h"
 
@@ -22,14 +23,14 @@ bool binary_loader_load(resource_loader *self, cstr name,
   string_fmt(full_file_path, sizeof(full_file_path), format_str,
              resource_system_base_path(), self->type_path, name, "");
 
-  out_resource->full_path = string_dup(full_file_path);
-
   fs::File f;
   if (!fs::open(full_file_path, fs::Mode::READ, true, &f)) {
     NS_ERROR("binary_loader_load - Failed to open binary file '%s'",
              full_file_path);
     return false;
   }
+
+  out_resource->full_path = string_dup(full_file_path);
 
   usize file_size = 0;
   if (!fs::fsize(&f, &file_size)) {
@@ -58,23 +59,7 @@ bool binary_loader_load(resource_loader *self, cstr name,
 }
 
 void binary_loader_unload(resource_loader *self, Resource *resource) {
-  if (!self || !resource) {
-    NS_WARN("binary_loader_unload - Loader or resource is null");
-    return;
-  }
-
-  i32 path_length = string_length(resource->full_path);
-  if (path_length) {
-    ns::free(resource->full_path, sizeof(char) * path_length + 1,
-             mem_tag::STRING);
-  }
-
-  if (resource->data) {
-    ns::free(resource->data, resource->data_size, mem_tag::ARRAY);
-    resource->data = nullptr;
-    resource->data_size = 0;
-    resource->loader_id = INVALID_ID;
-  }
+  resource_unload(self, resource, mem_tag::ARRAY);
 }
 
 resource_loader binary_resource_loader_create() {

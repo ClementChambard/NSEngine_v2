@@ -235,6 +235,8 @@ bool load_material(MaterialConfig config, Material *m) {
 
   string_ncpy(m->name, config.name, Material::NAME_MAX_LENGTH);
 
+  m->type = config.type;
+
   m->diffuse_color = config.diffuse_color;
 
   if (string_length(config.diffuse_map_name) > 0) {

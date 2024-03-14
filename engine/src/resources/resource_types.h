@@ -51,11 +51,14 @@ struct TextureMap {
   TextureUse use;
 };
 
+enum class MaterialType { WORLD, UI };
+
 struct Material {
   static constexpr usize NAME_MAX_LENGTH = 256;
   NSID id;
-  NSID internal_id;
   u32 generation;
+  NSID internal_id;
+  MaterialType type;
   char name[NAME_MAX_LENGTH];
   vec4 diffuse_color;
   TextureMap diffuse_map;
@@ -63,6 +66,7 @@ struct Material {
 
 struct MaterialConfig {
   char name[Material::NAME_MAX_LENGTH];
+  MaterialType type;
   bool auto_release;
   vec4 diffuse_color;
   char diffuse_map_name[Texture::NAME_MAX_LENGTH];

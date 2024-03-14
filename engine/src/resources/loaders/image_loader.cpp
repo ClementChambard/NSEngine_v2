@@ -5,6 +5,7 @@
 #include "../../core/ns_string.h"
 #include "../../systems/resource_system.h"
 #include "../resource_types.h"
+#include "./loader_utils.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -78,9 +79,9 @@ void image_loader_unload(resource_loader *self, Resource *resource) {
   }
 
   if (resource->data) {
-    ns::free(resource->data, resource->data_size, mem_tag::TEXTURE);
     stbi_image_free(
         reinterpret_cast<ImageResourceData *>(resource->data)->pixels);
+    ns::free(resource->data, resource->data_size, mem_tag::TEXTURE);
     resource->data = nullptr;
     resource->data_size = 0;
     resource->loader_id = INVALID_ID;

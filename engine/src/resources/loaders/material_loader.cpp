@@ -6,6 +6,7 @@
 #include "../../math/ns_math.h"
 #include "../../systems/resource_system.h"
 #include "../resource_types.h"
+#include "./loader_utils.h"
 
 #include "../../platform/filesystem.h"
 
@@ -23,14 +24,14 @@ bool material_loader_load(resource_loader *self, cstr name,
   string_fmt(full_file_path, sizeof(full_file_path), format_str,
              resource_system_base_path(), self->type_path, name, ".nsmt");
 
-  out_resource->full_path = string_dup(full_file_path);
-
   fs::File f;
   if (!fs::open(full_file_path, fs::Mode::READ, false, &f)) {
     NS_ERROR("material_loader_load - Failed to open material file '%s'",
              full_file_path);
     return false;
   }
+
+  out_resource->full_path = string_dup(full_file_path);
 
   MaterialConfig *resource_data = reinterpret_cast<MaterialConfig *>(
       ns::alloc(sizeof(MaterialConfig), mem_tag::MATERIAL_INSTANCE));
@@ -84,6 +85,10 @@ bool material_loader_load(resource_loader *self, cstr name,
     } else if (string_EQ(var_name, "diffuse_map_name")) {
       string_ncpy(resource_data->diffuse_map_name, var_value,
                   Texture::NAME_MAX_LENGTH);
+    } else if (string_EQ(var_name, "type")) {
+      if (string_EQ(var_value, "ui")) {
+        resource_data->type = MaterialType::UI;
+      }
     }
     // TODO(ClementChambard): more
 
@@ -101,22 +106,7 @@ bool material_loader_load(resource_loader *self, cstr name,
 }
 
 void material_loader_unload(resource_loader *self, Resource *resource) {
-  if (!self || !resource) {
-    NS_WARN("material_loader_unload - Loader or resource is null");
-    return;
-  }
-
-  u32 path_len = string_length(resource->full_path);
-  if (path_len) {
-    ns::free(resource->full_path, sizeof(char) * path_len + 1, mem_tag::STRING);
-  }
-
-  if (resource->data) {
-    ns::free(resource->data, resource->data_size, mem_tag::MATERIAL_INSTANCE);
-    resource->data = nullptr;
-    resource->data_size = 0;
-    resource->loader_id = INVALID_ID;
-  }
+  resource_unload(self, resource, mem_tag::MATERIAL_INSTANCE);
 }
 
 resource_loader material_resource_loader_create() {
