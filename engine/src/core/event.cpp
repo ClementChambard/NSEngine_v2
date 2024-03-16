@@ -1,6 +1,8 @@
 #include "./event.h"
 
-#include "../containers/vector.h"
+#include "../containers/vec.h"
+
+namespace ns {
 
 struct registered_event {
   ptr listener;
@@ -10,7 +12,7 @@ struct registered_event {
 #define MAX_MESSAGE_CODES 4096
 
 struct event_system_state {
-  ns::vector<registered_event> registered[MAX_MESSAGE_CODES];
+  Vec<registered_event> registered[MAX_MESSAGE_CODES];
 };
 
 static event_system_state *state_ptr;
@@ -28,7 +30,7 @@ void event_system_shutdown(ptr /*state*/) {
   if (!state_ptr)
     return;
   for (u16 i = 0; i < MAX_MESSAGE_CODES; i++) {
-    ns::vector<registered_event>().swap(state_ptr->registered[i]);
+    state_ptr->registered[i].free();
   }
   state_ptr = nullptr;
 }
@@ -38,14 +40,14 @@ bool event_register(u16 code, ptr listener, PFNONEVENT on_event) {
     return false;
   }
 
-  for (usize i = 0; i < state_ptr->registered[code].size(); i++) {
+  for (usize i = 0; i < state_ptr->registered[code].len(); i++) {
     if (state_ptr->registered[code][i].listener == listener) {
       // TODO(ClementChambard): warn
       return false;
     }
   }
 
-  state_ptr->registered[code].push_back({
+  state_ptr->registered[code].push({
       .listener = listener,
       .callback = on_event,
   });
@@ -82,3 +84,5 @@ bool event_fire(u16 code, ptr sender, event_context context) {
 
   return false;
 }
+
+} // namespace ns

@@ -5,8 +5,8 @@
 #include "./event.h"
 #include "./input.h"
 #include "./logger.h"
-#include "./ns_memory.h"
-#include "./ns_string.h"
+#include "./memory.h"
+#include "./string.h"
 
 #include "../memory/linear_allocator.h"
 
@@ -20,7 +20,9 @@
 #include <new>
 
 // temp
-#include "../math/ns_math.h"
+#include "../math/math.h"
+
+namespace ns {
 
 struct application_state {
   game *game_inst;
@@ -28,7 +30,7 @@ struct application_state {
   bool is_suspended;
   i16 width;
   i16 height;
-  ns::clock_t clock;
+  clock_t clock;
   f64 last_time;
   linear_allocator systems_allocator;
 
@@ -63,8 +65,8 @@ struct application_state {
   ptr geometry_system_state;
 
   // temp
-  ns::Geometry *test_geometry;
-  ns::Geometry *test_2d_geometry;
+  Geometry *test_geometry;
+  Geometry *test_2d_geometry;
 };
 
 static application_state *app_state;
@@ -92,15 +94,15 @@ bool application_on_debug_event(u16, ptr, ptr, event_context) {
 
   if (app_state->test_geometry) {
     app_state->test_geometry->material->diffuse_map.texture =
-        ns::texture_system_acquire(names[choice], true);
+        texture_system_acquire(names[choice], true);
     if (!app_state->test_geometry->material->diffuse_map.texture) {
       NS_WARN("Unable to load texture '%s' for test geometry, using default.",
               names[choice]);
       app_state->test_geometry->material->diffuse_map.texture =
-          ns::texture_system_get_default_texture();
+          texture_system_get_default_texture();
     }
     if (!first) {
-      ns::texture_system_release(old_name);
+      texture_system_release(old_name);
     }
     first = false;
   }
@@ -115,7 +117,7 @@ bool application_create(game *game_inst) {
   }
 
   game_inst->application_state =
-      ns::alloc(sizeof(application_state), ns::mem_tag::APPLICATION);
+      ns::alloc(sizeof(application_state), MemTag::APPLICATION);
   app_state =
       reinterpret_cast<application_state *>(game_inst->application_state);
   app_state->game_inst = game_inst;
@@ -126,12 +128,12 @@ bool application_create(game *game_inst) {
       linear_allocator(systems_allocator_total_size, nullptr);
 
   // initialize subsystems
-  ns::memory_system_initialize(&app_state->memory_system_memory_requirement,
-                               nullptr);
+  memory_system_initialize(&app_state->memory_system_memory_requirement,
+                           nullptr);
   app_state->memory_system_state = app_state->systems_allocator.allocate(
       app_state->memory_system_memory_requirement);
-  ns::memory_system_initialize(&app_state->memory_system_memory_requirement,
-                               app_state->memory_system_state);
+  memory_system_initialize(&app_state->memory_system_memory_requirement,
+                           app_state->memory_system_state);
 
   event_system_initialize(&app_state->event_system_memory_requirement, nullptr);
   app_state->event_system_state = app_state->systems_allocator.allocate(
@@ -139,21 +141,20 @@ bool application_create(game *game_inst) {
   event_system_initialize(&app_state->event_system_memory_requirement,
                           app_state->event_system_state);
 
-  ns::initialize_logging(&app_state->logging_system_memory_requirement,
-                         nullptr);
+  initialize_logging(&app_state->logging_system_memory_requirement, nullptr);
   app_state->logging_system_state = app_state->systems_allocator.allocate(
       app_state->logging_system_memory_requirement);
-  if (!ns::initialize_logging(&app_state->logging_system_memory_requirement,
-                              app_state->logging_system_state)) {
+  if (!initialize_logging(&app_state->logging_system_memory_requirement,
+                          app_state->logging_system_state)) {
     NS_ERROR("Failed to initialize logging system; shutting down.");
     return false;
   }
-  ns::InputManager::initialize(&app_state->input_system_memory_requirement,
-                               nullptr);
+  InputManager::initialize(&app_state->input_system_memory_requirement,
+                           nullptr);
   app_state->input_system_state = app_state->systems_allocator.allocate(
       app_state->input_system_memory_requirement);
-  ns::InputManager::initialize(&app_state->input_system_memory_requirement,
-                               app_state->input_system_state);
+  InputManager::initialize(&app_state->input_system_memory_requirement,
+                           app_state->input_system_state);
 
   app_state->is_running = true;
   app_state->is_suspended = false;
@@ -163,11 +164,11 @@ bool application_create(game *game_inst) {
   // temp
   event_register(EVENT_CODE_DEBUG0, nullptr, application_on_debug_event);
 
-  platform_system_startup(&app_state->platform_system_memory_requirement,
-                          nullptr, nullptr, 0, 0, 0, 0);
+  platform::startup(&app_state->platform_system_memory_requirement, nullptr,
+                    nullptr, 0, 0, 0, 0);
   app_state->platform_system_state = app_state->systems_allocator.allocate(
       app_state->platform_system_memory_requirement);
-  if (!platform_system_startup(
+  if (!platform::startup(
           &app_state->platform_system_memory_requirement,
           app_state->platform_system_state, game_inst->app_config.name,
           game_inst->app_config.start_pos_x, game_inst->app_config.start_pos_y,
@@ -176,59 +177,59 @@ bool application_create(game *game_inst) {
     return false;
   }
 
-  ns::resource_system_config resource_sys_cfg{32, "../assets"};
-  ns::resource_system_initialize(&app_state->resource_system_memory_requirement,
-                                 nullptr, resource_sys_cfg);
+  resource_system_config resource_sys_cfg{32, "../assets"};
+  resource_system_initialize(&app_state->resource_system_memory_requirement,
+                             nullptr, resource_sys_cfg);
   app_state->resource_system_state = app_state->systems_allocator.allocate(
       app_state->resource_system_memory_requirement);
-  if (!ns::resource_system_initialize(
+  if (!resource_system_initialize(
           &app_state->resource_system_memory_requirement,
           app_state->resource_system_state, resource_sys_cfg)) {
     NS_FATAL("Failed to initialize resource system. Aborting application.");
     return false;
   }
 
-  ns::renderer_system_initialize(&app_state->renderer_system_memory_requirement,
-                                 nullptr, nullptr);
+  renderer_system_initialize(&app_state->renderer_system_memory_requirement,
+                             nullptr, nullptr);
   app_state->renderer_system_state = app_state->systems_allocator.allocate(
       app_state->renderer_system_memory_requirement);
-  if (!ns::renderer_system_initialize(
+  if (!renderer_system_initialize(
           &app_state->renderer_system_memory_requirement,
           app_state->renderer_system_state, game_inst->app_config.name)) {
     NS_FATAL("Failed to initialize renderer. Aborting application.");
     return false;
   }
 
-  ns::texture_system_config texture_sys_cfg{65536};
-  ns::texture_system_initialize(&app_state->texture_system_memory_requirement,
-                                nullptr, texture_sys_cfg);
+  texture_system_config texture_sys_cfg{65536};
+  texture_system_initialize(&app_state->texture_system_memory_requirement,
+                            nullptr, texture_sys_cfg);
   app_state->texture_system_state = app_state->systems_allocator.allocate(
       app_state->texture_system_memory_requirement);
-  if (!ns::texture_system_initialize(
-          &app_state->texture_system_memory_requirement,
-          app_state->texture_system_state, texture_sys_cfg)) {
+  if (!texture_system_initialize(&app_state->texture_system_memory_requirement,
+                                 app_state->texture_system_state,
+                                 texture_sys_cfg)) {
     NS_FATAL("Failed to initialize texture system. Aborting application.");
     return false;
   }
 
-  ns::material_system_config material_sys_cfg{4096};
-  ns::material_system_initialize(&app_state->material_system_memory_requirement,
-                                 nullptr, material_sys_cfg);
+  material_system_config material_sys_cfg{4096};
+  material_system_initialize(&app_state->material_system_memory_requirement,
+                             nullptr, material_sys_cfg);
   app_state->material_system_state = app_state->systems_allocator.allocate(
       app_state->material_system_memory_requirement);
-  if (!ns::material_system_initialize(
+  if (!material_system_initialize(
           &app_state->material_system_memory_requirement,
           app_state->material_system_state, material_sys_cfg)) {
     NS_FATAL("Failed to initialize material system. Aborting application.");
     return false;
   }
 
-  ns::geometry_system_config geometry_sys_cfg{4096};
-  ns::geometry_system_initialize(&app_state->geometry_system_memory_requirement,
-                                 nullptr, geometry_sys_cfg);
+  geometry_system_config geometry_sys_cfg{4096};
+  geometry_system_initialize(&app_state->geometry_system_memory_requirement,
+                             nullptr, geometry_sys_cfg);
   app_state->geometry_system_state = app_state->systems_allocator.allocate(
       app_state->geometry_system_memory_requirement);
-  if (!ns::geometry_system_initialize(
+  if (!geometry_system_initialize(
           &app_state->geometry_system_memory_requirement,
           app_state->geometry_system_state, geometry_sys_cfg)) {
     NS_FATAL("Failed to initialize geometry system. Aborting application.");
@@ -236,25 +237,24 @@ bool application_create(game *game_inst) {
   }
 
   // TEMP
-  ns::geometry_config config = ns::geometry_config::plane(
+  geometry_config config = geometry_config::plane(
       10.0f, 10.0f, 5, 5, 2.0f, 2.0f, "test geometry", "test_material");
-  app_state->test_geometry = ns::geometry_system_acquire(config, true);
+  app_state->test_geometry = geometry_system_acquire(config, true);
 
-  ns::free(config.vertices, sizeof(ns::vertex_3d) * config.vertex_count,
-           ns::mem_tag::ARRAY);
-  ns::free(config.indices, sizeof(u32) * config.index_count,
-           ns::mem_tag::ARRAY);
+  ns::free(config.vertices, sizeof(vertex_3d) * config.vertex_count,
+           MemTag::ARRAY);
+  ns::free(config.indices, sizeof(u32) * config.index_count, MemTag::ARRAY);
 
-  ns::geometry_config config2{};
-  config2.vertex_size = sizeof(ns::vertex_2d);
+  geometry_config config2{};
+  config2.vertex_size = sizeof(vertex_2d);
   config2.vertex_count = 4;
   config2.index_size = sizeof(u32);
   config2.index_count = 6;
-  ns::string_cpy(config2.material_name, "test_ui_material");
-  ns::string_cpy(config2.name, "test_ui_geometry");
+  string_cpy(config2.material_name, "test_ui_material");
+  string_cpy(config2.name, "test_ui_geometry");
 
   const f32 f = 512.0f;
-  ns::vertex_2d vertices[] = {
+  vertex_2d vertices[] = {
       {{0, 0}, {0, 0}},
       {{f, f}, {1, 1}},
       {{0, f}, {0, 1}},
@@ -265,7 +265,7 @@ bool application_create(game *game_inst) {
   u32 indices[] = {2, 1, 0, 3, 0, 1};
   config2.indices = indices;
 
-  app_state->test_2d_geometry = ns::geometry_system_acquire(config2, true);
+  app_state->test_2d_geometry = geometry_system_acquire(config2, true);
   // END TEMP
 
   if (!app_state->game_inst->initialize(app_state->game_inst)) {
@@ -286,10 +286,10 @@ bool application_run() {
   u8 frame_count [[maybe_unused]] = 0;
   f64 target_frame_seconds = 1.0 / 60.0;
 
-  NS_TRACE(ns::get_memory_usage_str());
+  NS_TRACE(get_memory_usage_str());
 
   while (app_state->is_running) {
-    if (!platform_pump_messages()) {
+    if (!platform::pump_messages()) {
       app_state->is_running = false;
     }
 
@@ -299,7 +299,7 @@ bool application_run() {
     app_state->clock.update();
     f64 current_time = app_state->clock.elapsed;
     f64 delta = (current_time - app_state->last_time);
-    f64 frame_start_time = platform_get_absolute_time();
+    f64 frame_start_time = platform::get_absolute_time();
 
     if (!app_state->game_inst->update(app_state->game_inst,
                                       static_cast<f32>(delta))) {
@@ -316,24 +316,24 @@ bool application_run() {
     }
 
     // TODO(ClementChambard): refactor packet creation
-    ns::render_packet packet;
+    render_packet packet;
     packet.delta_time = delta;
 
-    ns::geometry_render_data test_render;
+    geometry_render_data test_render;
     test_render.geometry = app_state->test_geometry;
-    test_render.model = ns::mat4(1.0f);
+    test_render.model = mat4(1.0f);
     packet.geometry_count = 1;
     packet.geometries = &test_render;
 
-    ns::geometry_render_data test_ui_render;
+    geometry_render_data test_ui_render;
     test_ui_render.geometry = app_state->test_2d_geometry;
-    test_ui_render.model = ns::mat4(1.0f);
+    test_ui_render.model = mat4(1.0f);
     packet.ui_geometry_count = 1;
     packet.ui_geometries = &test_ui_render;
 
     renderer_draw_frame(&packet);
 
-    f64 frame_end_time = platform_get_absolute_time();
+    f64 frame_end_time = platform::get_absolute_time();
     f64 frame_elapsed_time = frame_end_time - frame_start_time;
     running_time += frame_elapsed_time;
     f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
@@ -343,13 +343,13 @@ bool application_run() {
 
       bool limit_frames = false;
       if (remaining_ms > 0 && limit_frames) {
-        platform_sleep(remaining_ms - 1);
+        platform::sleep(remaining_ms - 1);
       }
 
       frame_count++;
     }
 
-    ns::InputManager::update(delta);
+    InputManager::update(delta);
 
     app_state->last_time = current_time;
   }
@@ -359,27 +359,27 @@ bool application_run() {
   event_unregister(EVENT_CODE_APPLICATION_QUIT, nullptr, application_on_event);
   event_unregister(EVENT_CODE_RESIZED, nullptr, application_on_resized);
 
-  ns::InputManager::cleanup(app_state->input_system_state);
+  InputManager::cleanup(app_state->input_system_state);
 
-  ns::geometry_system_shutdown(app_state->geometry_system_state);
+  geometry_system_shutdown(app_state->geometry_system_state);
 
-  ns::material_system_shutdown(app_state->material_system_state);
+  material_system_shutdown(app_state->material_system_state);
 
-  ns::texture_system_shutdown(app_state->texture_system_state);
+  texture_system_shutdown(app_state->texture_system_state);
 
-  ns::renderer_system_shutdown(app_state->renderer_system_state);
+  renderer_system_shutdown(app_state->renderer_system_state);
 
-  ns::resource_system_shutdown(app_state->resource_system_state);
+  resource_system_shutdown(app_state->resource_system_state);
 
-  platform_system_shutdown(app_state->platform_system_state);
+  platform::shutdown(app_state->platform_system_state);
 
-  ns::shutdown_logging(app_state->logging_system_state); // ???
+  shutdown_logging(app_state->logging_system_state); // ???
 
   event_system_shutdown(app_state->event_system_state);
 
-  NS_TRACE(ns::get_memory_usage_str());
+  NS_TRACE(get_memory_usage_str());
 
-  ns::memory_system_shutdown(app_state->memory_system_state);
+  memory_system_shutdown(app_state->memory_system_state);
 
   return true;
 }
@@ -424,7 +424,9 @@ bool application_on_resized(u16 code, ptr, ptr, event_context context) {
     app_state->is_suspended = false;
   }
   app_state->game_inst->on_resize(app_state->game_inst, width, height);
-  ns::renderer_on_resized(width, height);
+  renderer_on_resized(width, height);
 
   return false;
 }
+
+} // namespace ns

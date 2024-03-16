@@ -1,9 +1,9 @@
 #include "./vulkan_device.h"
 
-#include "../../containers/vector.h"
+#include "../../containers/vec.h"
 #include "../../core/logger.h"
-#include "../../core/ns_memory.h"
-#include "../../core/ns_string.h"
+#include "../../core/memory.h"
+#include "../../core/string.h"
 
 namespace ns::vulkan {
 
@@ -12,7 +12,7 @@ struct PhysicalDeviceRequirements {
   bool present;
   bool compute;
   bool transfer;
-  ns::vector<cstr> device_extension_names;
+  Vec<cstr> device_extension_names;
   bool sampler_anisotropy;
   bool discrete_gpu;
 };
@@ -141,7 +141,7 @@ void device_destroy(Context *context) {
     ns::free(context->device.swapchain_support.formats,
              sizeof(VkSurfaceFormatKHR) *
                  context->device.swapchain_support.format_count,
-             mem_tag::RENDERER);
+             MemTag::RENDERER);
     context->device.swapchain_support.format_count = 0;
     context->device.swapchain_support.formats = nullptr;
   }
@@ -150,7 +150,7 @@ void device_destroy(Context *context) {
     ns::free(context->device.swapchain_support.present_modes,
              sizeof(VkPresentModeKHR) *
                  context->device.swapchain_support.present_mode_count,
-             mem_tag::RENDERER);
+             MemTag::RENDERER);
     context->device.swapchain_support.present_mode_count = 0;
     context->device.swapchain_support.present_modes = nullptr;
   }
@@ -175,7 +175,7 @@ void device_query_swapchain_support(VkPhysicalDevice physical_device,
     if (!out_support_info->formats) {
       out_support_info->formats = reinterpret_cast<VkSurfaceFormatKHR *>(
           ns::alloc(sizeof(VkSurfaceFormatKHR) * out_support_info->format_count,
-                    mem_tag::RENDERER));
+                    MemTag::RENDERER));
     }
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
         physical_device, surface, &out_support_info->format_count,
@@ -190,7 +190,7 @@ void device_query_swapchain_support(VkPhysicalDevice physical_device,
       out_support_info->present_modes =
           reinterpret_cast<VkPresentModeKHR *>(ns::alloc(
               sizeof(VkPresentModeKHR) * out_support_info->present_mode_count,
-              mem_tag::RENDERER));
+              MemTag::RENDERER));
     }
     VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(
         physical_device, surface, &out_support_info->present_mode_count,
@@ -422,13 +422,13 @@ static bool physical_device_meets_requirements(
     if (out_swapchain_support->formats) {
       ns::free(out_swapchain_support->formats,
                sizeof(VkSurfaceFormatKHR) * out_swapchain_support->format_count,
-               mem_tag::RENDERER);
+               MemTag::RENDERER);
     }
     if (out_swapchain_support->present_modes) {
       ns::free(out_swapchain_support->present_modes,
                sizeof(VkPresentModeKHR) *
                    out_swapchain_support->present_mode_count,
-               mem_tag::RENDERER);
+               MemTag::RENDERER);
     }
     NS_INFO("Required swapchain support not present. skipping device.");
     return false;
@@ -441,7 +441,7 @@ static bool physical_device_meets_requirements(
   if (available_extension_count != 0) {
     available_extensions = reinterpret_cast<VkExtensionProperties *>(
         ns::alloc(sizeof(VkExtensionProperties) * available_extension_count,
-                  mem_tag::RENDERER));
+                  MemTag::RENDERER));
     VK_CHECK(vkEnumerateDeviceExtensionProperties(
         device, 0, &available_extension_count, available_extensions));
 
@@ -458,14 +458,14 @@ static bool physical_device_meets_requirements(
         NS_INFO("Required extension not found: '%s', skipping device.", re);
         ns::free(available_extensions,
                  sizeof(VkExtensionProperties) * available_extension_count,
-                 mem_tag::RENDERER);
+                 MemTag::RENDERER);
         return false;
       }
     }
   }
   ns::free(available_extensions,
            sizeof(VkExtensionProperties) * available_extension_count,
-           mem_tag::RENDERER);
+           MemTag::RENDERER);
 
   if (requirements->sampler_anisotropy && !features->samplerAnisotropy) {
     NS_INFO("Device does not support samplerAnisotropy, skipping.");

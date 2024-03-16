@@ -1,7 +1,9 @@
 #include "./linear_allocator.h"
 
 #include "../core/logger.h"
-#include "../core/ns_memory.h"
+#include "../core/memory.h"
+
+namespace ns {
 
 linear_allocator::linear_allocator(usize total_size, ptr memory)
     : total_size(total_size), allocated(0) {
@@ -9,13 +11,13 @@ linear_allocator::linear_allocator(usize total_size, ptr memory)
   if (memory) {
     this->memory = memory;
   } else {
-    this->memory = ns::alloc(total_size, ns::mem_tag::LINEAR_ALLOCATOR);
+    this->memory = ns::alloc(total_size, ns::MemTag::LINEAR_ALLOCATOR);
   }
 }
 
 linear_allocator::~linear_allocator() {
   if (owns_memory && memory) {
-    ns::free(memory, total_size, ns::mem_tag::LINEAR_ALLOCATOR);
+    ns::free(memory, total_size, ns::MemTag::LINEAR_ALLOCATOR);
   }
   memory = nullptr;
   total_size = 0;
@@ -52,3 +54,5 @@ void linear_allocator::free_all() {
     ns::mem_zero(memory, total_size);
   }
 }
+
+} // namespace ns

@@ -3,6 +3,8 @@
 
 #include "../defines.h"
 
+namespace ns {
+
 struct event_context {
   union {
     i64 I64[2];
@@ -53,5 +55,7 @@ enum system_event_code {
 
   MAX_EVENT_CODE = 0xff,
 };
+
+} // namespace ns
 
 #endif // EVENT_HEADER_INCLUDED

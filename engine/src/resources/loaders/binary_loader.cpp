@@ -1,8 +1,8 @@
 #include "./binary_loader.h"
 
 #include "../../core/logger.h"
-#include "../../core/ns_memory.h"
-#include "../../core/ns_string.h"
+#include "../../core/memory.h"
+#include "../../core/string.h"
 #include "../../systems/resource_system.h"
 #include "../resource_types.h"
 #include "./loader_utils.h"
@@ -40,7 +40,7 @@ bool binary_loader_load(resource_loader *self, cstr name,
   }
 
   bytes resource_data =
-      reinterpret_cast<bytes>(ns::alloc(file_size, mem_tag::ARRAY));
+      reinterpret_cast<bytes>(ns::alloc(file_size, MemTag::ARRAY));
   usize read_size = 0;
   if (!fs::read_all_bytes(&f, resource_data, &read_size)) {
     NS_ERROR("binary_loader_load - Failed to read binary file '%s'",
@@ -59,7 +59,7 @@ bool binary_loader_load(resource_loader *self, cstr name,
 }
 
 void binary_loader_unload(resource_loader *self, Resource *resource) {
-  resource_unload(self, resource, mem_tag::ARRAY);
+  resource_unload(self, resource, MemTag::ARRAY);
 }
 
 resource_loader binary_resource_loader_create() {

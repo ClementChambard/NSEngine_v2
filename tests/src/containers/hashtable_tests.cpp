@@ -5,7 +5,7 @@
 #include <containers/hashtable.h>
 #include <defines.h>
 
-using namespace ns;
+using ns::chashtable;
 
 u8 hashtable_should_create_and_destroy() {
   const usize element_size = sizeof(u64);

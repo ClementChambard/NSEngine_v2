@@ -1,4 +1,4 @@
-#include "./ns_memory.h"
+#include "./memory.h"
 
 #include "../platform/platform.h"
 #include "./logger.h"
@@ -9,12 +9,12 @@ namespace ns {
 
 struct memory_stats {
   u64 total_allocated;
-  u64 tagged_allocations[static_cast<usize>(mem_tag::MAX_TAGS)];
+  u64 tagged_allocations[static_cast<usize>(MemTag::MAX_TAGS)];
 };
 
-NS_STATIC_ASSERT(static_cast<usize>(mem_tag::MAX_TAGS) == 18,
+NS_STATIC_ASSERT(static_cast<usize>(MemTag::MAX_TAGS) == 18,
                  "update memory tag strings");
-static cstr memory_tag_strings[static_cast<usize>(mem_tag::MAX_TAGS)] = {
+static cstr memory_tag_strings[static_cast<usize>(MemTag::MAX_TAGS)] = {
     "UNKNOWN    ", "LINEAR_ALLC", "ARRAY      ", "VECTOR     ", "DICT       ",
     "RING_QUEUE ", "BST        ", "STRING     ", "APPLICATION", "JOB        ",
     "TEXTURE    ", "MAT_INST   ", "RENDERER   ", "GAME       ", "TRANSFORM  ",
@@ -35,13 +35,13 @@ void memory_system_initialize(usize *memory_requirement, ptr state) {
   }
   state_ptr = reinterpret_cast<memory_system_state *>(state);
   state_ptr->alloc_count = 0;
-  platform_zero_memory(&state_ptr->stats, sizeof(memory_stats));
+  platform::zero_memory(&state_ptr->stats, sizeof(memory_stats));
 }
 
 void memory_system_shutdown(ptr /*state*/) { state_ptr = nullptr; }
 
-ptr alloc(usize size, mem_tag tag) {
-  if (tag == mem_tag::UNKNOWN) {
+ptr alloc(usize size, MemTag tag) {
+  if (tag == MemTag::UNKNOWN) {
     NS_WARN("ns::alloc called using mem_tag::UNKNOWN. Re-class this "
             "allocation.");
   }
@@ -53,14 +53,29 @@ ptr alloc(usize size, mem_tag tag) {
   }
 
   // TODO(ClementChambard): memory alignment
-  ptr block = platform_allocate(size, false);
-  platform_zero_memory(block, size);
+  ptr block = platform::allocate_memory(size, false);
+  platform::zero_memory(block, size);
 
   return block;
 }
 
-void free(ptr block, usize size, mem_tag tag) {
-  if (tag == mem_tag::UNKNOWN) {
+NS_API ptr realloc(ptr block, usize prev_size, usize new_size, MemTag tag) {
+  if (tag == MemTag::UNKNOWN) {
+    NS_WARN("ns::realloc called using mem_tag::UNKNOWN. Re-class this "
+            "reallocation.");
+  }
+
+  if (state_ptr) {
+    isize s_diff = new_size - prev_size;
+    state_ptr->stats.total_allocated += s_diff;
+    state_ptr->stats.tagged_allocations[static_cast<usize>(tag)] += s_diff;
+  }
+
+  return platform::reallocate_memory(block, new_size, false);
+}
+
+void free(ptr block, usize size, MemTag tag) {
+  if (tag == MemTag::UNKNOWN) {
     NS_WARN("ns::free called using mem_tag::UNKNOWN. Re-class this "
             "free.");
   }
@@ -71,22 +86,22 @@ void free(ptr block, usize size, mem_tag tag) {
   }
 
   // TODO(ClementChambard): memory alignment
-  platform_free(block, false);
+  platform::free_memory(block, false);
 }
 
 ptr mem_zero(ptr block, usize size) {
-  return platform_zero_memory(block, size);
+  return platform::zero_memory(block, size);
 }
 
 ptr mem_copy(ptr dest, roptr source, usize size) {
-  return platform_copy_memory(dest, source, size);
+  return platform::copy_memory(dest, source, size);
 }
 
 ptr mem_set(ptr dest, i32 value, usize size) {
-  return platform_set_memory(dest, value, size);
+  return platform::set_memory(dest, value, size);
 }
 
-str get_memory_usage_str() {
+pstr get_memory_usage_str() {
   if (!state_ptr)
     return nullptr;
   const usize gib = 1024 * 1024 * 1024;
@@ -95,7 +110,7 @@ str get_memory_usage_str() {
 
   char buffer[8000] = "System memory use (tagged):\n";
   usize offset = strlen(buffer);
-  for (u32 i = 0; i < static_cast<u32>(mem_tag::MAX_TAGS); ++i) {
+  for (u32 i = 0; i < static_cast<u32>(MemTag::MAX_TAGS); ++i) {
     char unit[4] = "XiB";
     f32 amount = 1.0f;
     if (state_ptr->stats.tagged_allocations[i] >= gib) {
@@ -117,7 +132,7 @@ str get_memory_usage_str() {
                        "  %s: %.2f%s\n", memory_tag_strings[i], amount, unit);
   }
 
-  str out_string = strdup(buffer);
+  pstr out_string = strdup(buffer);
   return out_string;
 }
 

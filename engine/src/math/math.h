@@ -2,8 +2,8 @@
 #define NS_MATH_HEADER_INCLUDED
 
 #include "../defines.h"
-#include "./ns_cstes.h"
-#include "./types/math_types.h"
+#include "./cstes.h"
+#include "./types/types.h"
 
 namespace ns {
 

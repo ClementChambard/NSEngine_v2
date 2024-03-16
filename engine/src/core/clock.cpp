@@ -6,12 +6,12 @@ namespace ns {
 
 void clock_t::update() {
   if (start_time != 0) {
-    elapsed = platform_get_absolute_time() - start_time;
+    elapsed = platform::get_absolute_time() - start_time;
   }
 }
 
 void clock_t::start() {
-  start_time = platform_get_absolute_time();
+  start_time = platform::get_absolute_time();
   elapsed = 0.0;
 }
 

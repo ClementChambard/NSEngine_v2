@@ -1,8 +1,8 @@
 #include "./text_loader.h"
 
 #include "../../core/logger.h"
-#include "../../core/ns_memory.h"
-#include "../../core/ns_string.h"
+#include "../../core/memory.h"
+#include "../../core/string.h"
 #include "../../systems/resource_system.h"
 #include "../resource_types.h"
 #include "./loader_utils.h"
@@ -39,8 +39,8 @@ bool text_loader_load(resource_loader *self, cstr name,
     return false;
   }
 
-  str resource_data = reinterpret_cast<str>(
-      ns::alloc(file_size * sizeof(char), mem_tag::ARRAY));
+  pstr resource_data = reinterpret_cast<pstr>(
+      ns::alloc(file_size * sizeof(char), MemTag::ARRAY));
   usize read_size = 0;
   if (!fs::read_all_text(&f, resource_data, &read_size)) {
     NS_ERROR("text_loader_load - Failed to read text file '%s'",
@@ -59,7 +59,7 @@ bool text_loader_load(resource_loader *self, cstr name,
 }
 
 void text_loader_unload(resource_loader *self, Resource *resource) {
-  resource_unload(self, resource, mem_tag::ARRAY);
+  resource_unload(self, resource, MemTag::ARRAY);
 }
 
 resource_loader text_resource_loader_create() {

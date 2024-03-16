@@ -2,7 +2,7 @@
 #define RENDERER_TYPES_INLINE_INCLUDED
 
 #include "../defines.h"
-#include "../math/types/math_types.h"
+#include "../math/math.h"
 #include "../resources/resource_types.h"
 
 namespace ns {

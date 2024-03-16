@@ -3,6 +3,8 @@
 
 #include "../defines.h"
 
+namespace ns {
+
 struct linear_allocator {
   usize total_size;
   usize allocated;
@@ -17,5 +19,7 @@ struct linear_allocator {
 
   template <typename T> NS_API T *allocate_n(u64 count);
 };
+
+} // namespace ns
 
 #endif // LINEAR_ALLOCATOR_HEADER_INCLUDED

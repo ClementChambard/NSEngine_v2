@@ -1,11 +1,11 @@
 #ifndef NS_VEC4_HEADER_INCLUDED
 #define NS_VEC4_HEADER_INCLUDED
 
-#include "../../../core/ns_string.h"
+#include "../../../core/string.h"
 #include "../../../defines.h"
-#include "../../ns_cstes.h"
-#include "./ns_vec2.h"
-#include "./ns_vec3.h"
+#include "../../cstes.h"
+#include "./vec2.h"
+#include "./vec3.h"
 
 namespace ns {
 

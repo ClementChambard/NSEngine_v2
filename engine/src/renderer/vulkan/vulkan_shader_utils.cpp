@@ -1,7 +1,7 @@
 #include "./vulkan_shader_utils.h"
 
-#include "../../core/ns_memory.h"
-#include "../../core/ns_string.h"
+#include "../../core/memory.h"
+#include "../../core/string.h"
 
 #include "../../systems/resource_system.h"
 

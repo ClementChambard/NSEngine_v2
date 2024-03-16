@@ -1,9 +1,9 @@
 #include "./material_loader.h"
 
 #include "../../core/logger.h"
-#include "../../core/ns_memory.h"
-#include "../../core/ns_string.h"
-#include "../../math/ns_math.h"
+#include "../../core/memory.h"
+#include "../../core/string.h"
+#include "../../math/math.h"
 #include "../../systems/resource_system.h"
 #include "../resource_types.h"
 #include "./loader_utils.h"
@@ -34,7 +34,7 @@ bool material_loader_load(resource_loader *self, cstr name,
   out_resource->full_path = string_dup(full_file_path);
 
   MaterialConfig *resource_data = reinterpret_cast<MaterialConfig *>(
-      ns::alloc(sizeof(MaterialConfig), mem_tag::MATERIAL_INSTANCE));
+      ns::alloc(sizeof(MaterialConfig), MemTag::MATERIAL_INSTANCE));
 
   resource_data->auto_release = true;
   resource_data->diffuse_color = vec4(1.0f);
@@ -42,11 +42,11 @@ bool material_loader_load(resource_loader *self, cstr name,
   string_ncpy(resource_data->name, name, Material::NAME_MAX_LENGTH);
 
   char linebuf[512] = "";
-  str p = &linebuf[0];
+  pstr p = &linebuf[0];
   usize linelen = 0;
   u32 linenum = 1;
   while (fs::read_line(&f, 511, &p, &linelen)) {
-    str line = string_trim(p);
+    pstr line = string_trim(p);
     linelen = string_length(line);
 
     if (linelen < 1 || line[0] == '#') {
@@ -65,12 +65,12 @@ bool material_loader_load(resource_loader *self, cstr name,
     char raw_var_name[64];
     mem_zero(raw_var_name, sizeof(raw_var_name));
     string_sub(raw_var_name, line, 0, equal_index);
-    str var_name = string_trim(raw_var_name);
+    pstr var_name = string_trim(raw_var_name);
 
     char raw_var_value[446];
     mem_zero(raw_var_value, sizeof(raw_var_value));
     string_sub(raw_var_value, line, equal_index + 1, -1);
-    str var_value = string_trim(raw_var_value);
+    pstr var_value = string_trim(raw_var_value);
 
     if (string_EQ(var_name, "version")) {
       // TODO(ClementChambard)
@@ -106,7 +106,7 @@ bool material_loader_load(resource_loader *self, cstr name,
 }
 
 void material_loader_unload(resource_loader *self, Resource *resource) {
-  resource_unload(self, resource, mem_tag::MATERIAL_INSTANCE);
+  resource_unload(self, resource, MemTag::MATERIAL_INSTANCE);
 }
 
 resource_loader material_resource_loader_create() {

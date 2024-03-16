@@ -2,8 +2,8 @@
 #include <core/event.h>
 #include <core/input.h>
 #include <core/logger.h>
-#include <core/ns_memory.h>
-#include <math/ns_math.h>
+#include <core/memory.h>
+#include <math/math.h>
 
 // HACK: remove include when possible
 #include <renderer/renderer_frontend.h>
@@ -60,8 +60,8 @@ bool game_update(game *game_inst, f32 delta_time) {
   // TODO(ClementChambard): Temp
   if (ns::keyboard::released(NSK_T)) {
     NS_DEBUG("Swapping texture!");
-    event_context ctx{};
-    event_fire(EVENT_CODE_DEBUG0, game_inst, ctx);
+    ns::event_context ctx{};
+    ns::event_fire(ns::EVENT_CODE_DEBUG0, game_inst, ctx);
   }
   // TODO(ClementChambard): EndTemp
 
@@ -106,7 +106,7 @@ bool game_update(game *game_inst, f32 delta_time) {
   recalculate_view_matrix(state);
 
   // HACK: remove this call when possible
-  renderer_set_view(state->view);
+  ns::renderer_set_view(state->view);
 
   return true;
 }

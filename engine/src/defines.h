@@ -18,7 +18,7 @@ typedef float f32;
 typedef double f64;
 
 typedef char const *cstr;
-typedef char *str;
+typedef char *pstr;
 typedef void *ptr;
 typedef const void *roptr;
 typedef u8 byte;
@@ -86,7 +86,7 @@ NS_STATIC_ASSERT(sizeof(f64) == 8, "Expected f64 to be 8 byte.");
 #ifdef _MSC_VER
 #define NS_API __declspec(dllexport)
 #else
-#define NS_API __attribute__((visibility("default")))
+#define NS_API //__attribute__((visibility("default")))
 #endif
 #else
 #ifdef _MSC_VER

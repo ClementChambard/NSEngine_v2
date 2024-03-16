@@ -1,7 +1,7 @@
 #include "./vulkan_ui_shader.h"
 
-#include "../../../core/ns_memory.h"
-#include "../../../math/ns_math.h"
+#include "../../../core/memory.h"
+#include "../../../math/math.h"
 #include "../vulkan_buffer.h"
 #include "../vulkan_pipeline.h"
 #include "../vulkan_shader_utils.h"

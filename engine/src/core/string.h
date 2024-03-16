@@ -1,9 +1,30 @@
 #ifndef NS_STRING_HEADER_INCLUDED
 #define NS_STRING_HEADER_INCLUDED
 
+#include "../containers/vec.h"
 #include "../defines.h"
+#include "./memory.h"
+#include "./slice.h"
 
 namespace ns {
+
+struct Str : public Slice<char> {
+  explicit Str(cstr);
+  Str(Slice<char> s) : Slice<char>(s) {}
+};
+
+struct String : public Vec<char, MemTag::STRING> {
+  String(cstr s);
+  void resize(usize n, char c = '\0');
+  void push(char c);
+  void push(cstr s);
+  void push(Str s);
+  void push(String const &s);
+  char pop();
+  void erase(char const *it) { erase(static_cast<usize>(it - m_data)); }
+  void erase(usize index);
+  cstr c_str() const { return m_data; }
+};
 
 /**
  * Checks if two strings are equal
@@ -33,14 +54,14 @@ NS_API usize string_length(cstr s);
  * @param s the string to copy
  * @returns a copy of the string
  */
-NS_API str string_dup(cstr s);
+NS_API pstr string_dup(cstr s);
 
 /**
  * Clears a string
  * @param s the string to clear
  * @returns the cleared string
  */
-NS_API str string_clear(str s);
+NS_API pstr string_clear(pstr s);
 
 /**
  * Formats a string
@@ -49,7 +70,7 @@ NS_API str string_clear(str s);
  * @param format the format string
  * @returns the number of characters written
  */
-NS_API i32 string_fmt(str out, usize n, cstr format, ...);
+NS_API i32 string_fmt(pstr out, usize n, cstr format, ...);
 
 /**
  * Formats a string (va_list version)
@@ -59,7 +80,7 @@ NS_API i32 string_fmt(str out, usize n, cstr format, ...);
  * @param va_list the variable argument list
  * @returns the number of characters written
  */
-NS_API i32 string_fmt_v(str out, usize n, cstr format,
+NS_API i32 string_fmt_v(pstr out, usize n, cstr format,
                         __builtin_va_list va_list);
 
 /**
@@ -68,7 +89,7 @@ NS_API i32 string_fmt_v(str out, usize n, cstr format,
  * @param src the source string
  * @returns the destination string
  */
-NS_API str string_cpy(str dest, cstr src);
+NS_API pstr string_cpy(pstr dest, cstr src);
 
 /**
  * Copies a string (n characters)
@@ -77,14 +98,14 @@ NS_API str string_cpy(str dest, cstr src);
  * @param n the number of characters to copy
  * @returns the destination string
  */
-NS_API str string_ncpy(str dest, cstr src, usize n);
+NS_API pstr string_ncpy(pstr dest, cstr src, usize n);
 
 /**
  * Trims a string
  * @param s the string to trim
  * @returns the trimmed string
  */
-NS_API str string_trim(str s);
+NS_API pstr string_trim(pstr s);
 
 /**
  * Substring
@@ -93,7 +114,7 @@ NS_API str string_trim(str s);
  * @param start the start index
  * @param length the length
  */
-NS_API void string_sub(str dest, cstr src, usize start, isize length);
+NS_API void string_sub(pstr dest, cstr src, usize start, isize length);
 
 /**
  * Index of

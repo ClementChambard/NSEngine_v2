@@ -5,6 +5,8 @@
 #include <defines.h>
 #include <memory/linear_allocator.h>
 
+using ns::linear_allocator;
+
 u8 linear_allocator_should_create_and_destroy() {
   linear_allocator alloc(sizeof(u64), 0);
 

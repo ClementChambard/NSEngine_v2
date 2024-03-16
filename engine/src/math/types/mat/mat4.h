@@ -2,10 +2,10 @@
 #define NS_MAT4_HEADER_INCLUDED
 
 #include "../../../core/logger.h"
-#include "../../../core/ns_memory.h"
+#include "../../../core/memory.h"
 #include "../../../defines.h"
-#include "../vec/ns_vec3.h"
-#include "../vec/ns_vec4.h"
+#include "../vec/vec3.h"
+#include "../vec/vec4.h"
 
 namespace ns {
 
@@ -398,7 +398,7 @@ struct mat4 {
     return v;
   }
 
-  void dump(log_level level = log_level::TRACE) const {
+  void dump(LogLevel level = LogLevel::TRACE) const {
     for (usize i = 0; i < 4; i++) {
       log_output(level, "%f %f %f %f", d[i][0], d[i][1], d[i][2], d[i][3]);
     }

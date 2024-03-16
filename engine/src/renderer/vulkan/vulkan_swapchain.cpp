@@ -1,6 +1,6 @@
 #include "./vulkan_swapchain.h"
 #include "../../core/logger.h"
-#include "../../core/ns_memory.h"
+#include "../../core/memory.h"
 #include "./vulkan_device.h"
 #include "./vulkan_image.h"
 
@@ -24,9 +24,9 @@ void swapchain_recreate(Context *context, u32 width, u32 height,
 void swapchain_destroy(Context *context, Swapchain *swapchain) {
   destroy(context, swapchain);
   ns::free(swapchain->images, sizeof(VkImage) * swapchain->image_count,
-           mem_tag::RENDERER);
+           MemTag::RENDERER);
   ns::free(swapchain->views, sizeof(VkImageView) * swapchain->image_count,
-           mem_tag::RENDERER);
+           MemTag::RENDERER);
   swapchain->images = nullptr;
   swapchain->views = nullptr;
   swapchain->image_count = 0;
@@ -187,11 +187,11 @@ static void create(Context *context, u32 width, u32 height,
                                    &swapchain->image_count, nullptr));
   if (!swapchain->images) {
     swapchain->images = reinterpret_cast<VkImage *>(
-        ns::alloc(sizeof(VkImage) * swapchain->image_count, mem_tag::RENDERER));
+        ns::alloc(sizeof(VkImage) * swapchain->image_count, MemTag::RENDERER));
   }
   if (!swapchain->views) {
     swapchain->views = reinterpret_cast<VkImageView *>(ns::alloc(
-        sizeof(VkImageView) * swapchain->image_count, mem_tag::RENDERER));
+        sizeof(VkImageView) * swapchain->image_count, MemTag::RENDERER));
   }
   VK_CHECK(vkGetSwapchainImagesKHR(context->device, *swapchain,
                                    &swapchain->image_count, swapchain->images));

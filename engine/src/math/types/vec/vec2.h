@@ -1,9 +1,9 @@
 #ifndef NS_VEC2_HEADER_INCLUDED
 #define NS_VEC2_HEADER_INCLUDED
 
-#include "../../../core/ns_string.h"
+#include "../../../core/string.h"
 #include "../../../defines.h"
-#include "../../ns_cstes.h"
+#include "../../cstes.h"
 
 namespace ns {
 

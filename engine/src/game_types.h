@@ -4,7 +4,7 @@
 #include "./core/application.h"
 
 struct game {
-  application_config app_config;
+  ns::application_config app_config;
 
   bool (*initialize)(game *game_inst);
 

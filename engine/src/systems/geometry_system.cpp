@@ -1,8 +1,8 @@
 #include "./geometry_system.h"
 
 #include "../core/logger.h"
-#include "../core/ns_memory.h"
-#include "../core/ns_string.h"
+#include "../core/memory.h"
+#include "../core/string.h"
 #include "../renderer/renderer_frontend.h"
 #include "./material_system.h"
 
@@ -168,11 +168,11 @@ geometry_config geometry_config::plane(f32 width, f32 height,
   config.vertex_size = sizeof(vertex_3d);
   config.vertex_count = x_segment_count * y_segment_count * 4;
   config.vertices = reinterpret_cast<vertex_3d *>(
-      ns::alloc(sizeof(vertex_3d) * config.vertex_count, mem_tag::ARRAY));
+      ns::alloc(sizeof(vertex_3d) * config.vertex_count, MemTag::ARRAY));
   config.index_size = sizeof(u32);
   config.index_count = x_segment_count * y_segment_count * 6;
   config.indices = reinterpret_cast<u32 *>(
-      ns::alloc(sizeof(u32) * config.index_count, mem_tag::ARRAY));
+      ns::alloc(sizeof(u32) * config.index_count, MemTag::ARRAY));
 
   f32 seg_width = width / static_cast<f32>(x_segment_count);
   f32 seg_height = height / static_cast<f32>(y_segment_count);

@@ -1,7 +1,7 @@
 #include "./filesystem.h"
 
 #include "../core/logger.h"
-#include "../core/ns_memory.h"
+#include "../core/memory.h"
 
 #include <cstdio>
 #include <cstring>
@@ -69,11 +69,11 @@ bool fsize(File *handle, usize *out_size) {
   return false;
 }
 
-bool read_line(File *handle, usize max_length, str *line_buf,
+bool read_line(File *handle, usize max_length, pstr *line_buf,
                u64 *out_line_length) {
   if (!handle->handle || !line_buf || !out_line_length || max_length == 0)
     return false;
-  str buf = *line_buf;
+  pstr buf = *line_buf;
   if (std::fgets(buf, max_length, HANDLE(handle)) != nullptr) {
     *out_line_length = std::strlen(buf);
     return true;
@@ -114,7 +114,7 @@ bool read_all_bytes(File *handle, bytes out_bytes, usize *out_bytes_read) {
   return nread == s;
 }
 
-bool read_all_text(File *handle, str out_text, usize *out_bytes_read) {
+bool read_all_text(File *handle, pstr out_text, usize *out_bytes_read) {
   if (!handle->handle || !out_text)
     return false;
   usize s = 0;

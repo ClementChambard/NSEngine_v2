@@ -2,7 +2,7 @@
 
 #if NS_PLATFORM_LINUX
 
-#include "../containers/vector.h"
+#include "../containers/vec.h"
 #include "../core/event.h"
 #include "../core/input.h"
 #include "../core/logger.h"
@@ -29,6 +29,8 @@
 #include <unistd.h>
 #endif
 
+namespace ns::platform {
+
 struct platform_state {
   Display *display;
   xcb_connection_t *connection;
@@ -43,9 +45,8 @@ static platform_state *state_ptr;
 
 ns_key translate_keycode(u32 x_keycode);
 
-bool platform_system_startup(usize *memory_requirement, ptr state,
-                             cstr application_name, i32 x, i32 y, i32 width,
-                             i32 height) {
+bool startup(usize *memory_requirement, ptr state, cstr application_name, i32 x,
+             i32 y, i32 width, i32 height) {
   *memory_requirement = sizeof(platform_state);
   if (state == nullptr) {
     return true;
@@ -122,7 +123,7 @@ bool platform_system_startup(usize *memory_requirement, ptr state,
   return true;
 }
 
-void platform_system_shutdown(ptr /*state*/) {
+void shutdown(ptr /*state*/) {
   if (!state_ptr)
     return;
   XAutoRepeatOn(state_ptr->display);
@@ -130,7 +131,7 @@ void platform_system_shutdown(ptr /*state*/) {
   xcb_destroy_window(state_ptr->connection, state_ptr->window);
 }
 
-bool platform_pump_messages() {
+bool pump_messages() {
   if (!state_ptr)
     return true;
   xcb_generic_event_t *event;
@@ -153,8 +154,8 @@ bool platform_pump_messages() {
           XkbKeycodeToKeysym(state_ptr->display, static_cast<KeyCode>(code), 0,
                              code & ShiftMask ? 1 : 0);
 
-      ns::InputManager::process_key(translate_keycode(key_sym),
-                                    event->response_type == XCB_KEY_PRESS);
+      InputManager::process_key(translate_keycode(key_sym),
+                                event->response_type == XCB_KEY_PRESS);
     } break;
     case XCB_BUTTON_PRESS:
     case XCB_BUTTON_RELEASE: {
@@ -162,24 +163,24 @@ bool platform_pump_messages() {
           reinterpret_cast<xcb_button_press_event_t *>(event);
       switch (mouse_event->detail) {
       case XCB_BUTTON_INDEX_1:
-        ns::InputManager::process_button(NSB_LEFT, event->response_type ==
-                                                       XCB_BUTTON_PRESS);
+        InputManager::process_button(NSB_LEFT,
+                                     event->response_type == XCB_BUTTON_PRESS);
         break;
       case XCB_BUTTON_INDEX_2:
-        ns::InputManager::process_button(NSB_MIDDLE, event->response_type ==
-                                                         XCB_BUTTON_PRESS);
+        InputManager::process_button(NSB_MIDDLE,
+                                     event->response_type == XCB_BUTTON_PRESS);
         break;
       case XCB_BUTTON_INDEX_3:
-        ns::InputManager::process_button(NSB_RIGHT, event->response_type ==
-                                                        XCB_BUTTON_PRESS);
+        InputManager::process_button(NSB_RIGHT,
+                                     event->response_type == XCB_BUTTON_PRESS);
         break;
       }
     } break;
     case XCB_MOTION_NOTIFY: {
       xcb_motion_notify_event_t *mouse_event =
           reinterpret_cast<xcb_motion_notify_event_t *>(event);
-      ns::InputManager::process_mouse_move(mouse_event->event_x,
-                                           mouse_event->event_y);
+      InputManager::process_mouse_move(mouse_event->event_x,
+                                       mouse_event->event_y);
     } break;
     case XCB_CONFIGURE_NOTIFY: {
       xcb_configure_notify_event_t *configure_event =
@@ -207,41 +208,43 @@ bool platform_pump_messages() {
   return !quit_flagged;
 }
 
-ptr platform_allocate(usize size, bool /* aligned */) {
+ptr allocate_memory(usize size, bool /* aligned */) {
   return std::malloc(size);
 }
 
-void platform_free(ptr block, bool /* aligned */) { std::free(block); }
-
-ptr platform_zero_memory(ptr block, usize size) {
-  return std::memset(block, 0, size);
+ptr reallocate_memory(ptr block, usize new_size, bool /* aligned */) {
+  return std::realloc(block, new_size);
 }
 
-ptr platform_copy_memory(ptr dest, roptr source, usize size) {
+void free_memory(ptr block, bool /* aligned */) { std::free(block); }
+
+ptr zero_memory(ptr block, usize size) { return std::memset(block, 0, size); }
+
+ptr copy_memory(ptr dest, roptr source, usize size) {
   return std::memcpy(dest, source, size);
 }
 
-ptr platform_set_memory(ptr dest, i32 value, usize size) {
+ptr set_memory(ptr dest, i32 value, usize size) {
   return std::memset(dest, value, size);
 }
 
-void platform_console_write(cstr message, u8 color) {
+void console_write(cstr message, u8 color) {
   cstr levels[6] = {"0;41", "1;31", "1;33", "1;32", "1;34", "0;36"};
   std::printf("\033[%sm%s\033[0m", levels[color], message);
 }
 
-void platform_console_write_error(cstr message, u8 color) {
+void console_write_error(cstr message, u8 color) {
   cstr levels[6] = {"0;41", "1;31", "1;33", "1;32", "1;34", "0;36"};
   std::printf("\033[%sm%s\033[0m", levels[color], message);
 }
 
-f64 platform_get_absolute_time() {
+f64 get_absolute_time() {
   timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
   return now.tv_sec + now.tv_nsec * 0.000000001;
 }
 
-void platform_sleep(u64 ms) {
+void sleep(u64 ms) {
 #if _POSIX_C_SOURCE >= 199309L
   timespec ts;
   ts.tv_sec = ms / 1000;
@@ -255,11 +258,11 @@ void platform_sleep(u64 ms) {
 #endif
 }
 
-void platform_get_required_extension_names(ns::vector<cstr> *names_darray) {
-  names_darray->push_back("VK_KHR_xcb_surface");
+void get_required_extension_names(Vec<cstr> *names_darray) {
+  names_darray->push("VK_KHR_xcb_surface");
 }
 
-bool platform_create_vulkan_surface(ns::vulkan::Context *context) {
+bool create_vulkan_surface(vulkan::Context *context) {
   if (!state_ptr)
     return false;
   VkXcbSurfaceCreateInfoKHR create_info{};
@@ -522,5 +525,7 @@ ns_key translate_keycode(u32 x_keycode) {
     return static_cast<ns_key>(0);
   }
 }
+
+} // namespace ns::platform
 
 #endif // NS_PLATFORM_LINUX

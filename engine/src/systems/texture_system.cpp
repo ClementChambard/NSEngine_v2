@@ -2,8 +2,8 @@
 
 #include "../containers/hashtable.h"
 #include "../core/logger.h"
-#include "../core/ns_memory.h"
-#include "../core/ns_string.h"
+#include "../core/memory.h"
+#include "../core/string.h"
 
 #include "../renderer/renderer_frontend.h"
 

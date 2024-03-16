@@ -15,6 +15,8 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_win32.h>
 
+namespace ns::platform {
+
 struct platform_state {
   HINSTANCE h_instance;
   HWND hwnd;
@@ -36,9 +38,8 @@ void clock_setup() {
   QueryPerformanceCounter(&start_time);
 }
 
-bool platform_system_startup(u64 memory_requirement, ptr state,
-                             cstr application_name, i32 x, i32 y, i32 width,
-                             i32 height) {
+bool startup(u64 memory_requirement, ptr state, cstr application_name, i32 x,
+             i32 y, i32 width, i32 height) {
   *memory_requirement = sizeof(platform_state);
   if (state == nullptr) {
     return true;
@@ -117,14 +118,14 @@ bool platform_system_startup(u64 memory_requirement, ptr state,
   return true;
 }
 
-void platform_system_shutdown(ptr plat_state) {
+void shutdown(ptr plat_state) {
   if (state_ptr && state_ptr->hwnd) {
     DestroyWindow(state_ptr->hwnd);
     state_ptr->hwnd = 0;
   }
 }
 
-bool platform_pump_messages() {
+bool pump_messages() {
   if (!state_ptr)
     return true;
   MSG message;
@@ -135,23 +136,27 @@ bool platform_pump_messages() {
   return true;
 }
 
-ptr platform_allocate(usize size, bool /* aligned */) { return malloc(size); }
-
-void platform_free(ptr block, bool /* aligned */) { free(block); }
-
-ptr platform_zero_memory(ptr block, usize size) {
-  return memset(block, 0, size);
+ptr allocate_memory(usize size, bool /* aligned */) {
+  return std::malloc(size);
 }
 
-ptr platform_copy_memory(ptr dest, roptr source, usize size) {
+ptr reallocate_memory(ptr block, usize new_size, bool /* aligned */) {
+  return std::realloc(block, new_size);
+}
+
+void free_memory(ptr block, bool /* aligned */) { std::free(block); }
+
+ptr zero_memory(ptr block, usize size) { return memset(block, 0, size); }
+
+ptr copy_memory(ptr dest, roptr source, usize size) {
   return memcpy(dest, source, size);
 }
 
-ptr platform_set_memory(ptr dest, i32 value, usize size) {
+ptr set_memory(ptr dest, i32 value, usize size) {
   return memset(dest, value, size);
 }
 
-void platform_console_write(cstr message, u8 color) {
+void console_write(cstr message, u8 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   static u8 levels[6] = {64, 4, 6, 2, 1, 8};
   SetConsoleTextAttribute(console_handle, levels[color]);
@@ -163,7 +168,7 @@ void platform_console_write(cstr message, u8 color) {
                 number_written, 0);
 }
 
-void platform_console_write_error(cstr message, u8 color) {
+void console_write_error(cstr message, u8 color) {
   HANDLE console_handle = GetStdHandle(STD_ERROR_HANDLE);
   static u8 levels[6] = {64, 4, 6, 2, 1, 8};
   SetConsoleTextAttribute(console_handle, levels[color]);
@@ -175,7 +180,7 @@ void platform_console_write_error(cstr message, u8 color) {
                 0);
 }
 
-f64 platplatform_get_absolute_time() {
+f64 get_absolute_time() {
   if (!clock_frequency)
     clock_setup();
   LARGE_INTEGER now_time;
@@ -183,13 +188,13 @@ f64 platplatform_get_absolute_time() {
   return static_cast<f64>(now_time.QuadPart) * clock_frequency;
 }
 
-void platform_slplatform_sleep(u64 ms) { Sleep(ms); }
+void sleep(u64 ms) { Sleep(ms); }
 
-void platform_get_required_extension_names(ns::vector<cstr> *names_darray) {
+void get_required_extension_names(vector<cstr> *names_darray) {
   names_darray->push_back("VK_KHR_win32_surface");
 }
 
-bool platform_create_vulkan_surface(ns::vulkan::Context *context) {
+bool create_vulkan_surface(vulkan::Context *context) {
   if (!state_ptr)
     return false;
   VkWin32SurfaceCreateInfoKHR create_info;
@@ -244,17 +249,16 @@ LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param,
     } else if (w_param == VK_CONTROL) {
       key = is_extended ? KEY_RCONTROL : KEY_LCONTROL;
     }
-    ns::InputManager::process_key(key,
-                                  msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN);
+    InputManager::process_key(key, msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN);
   } break;
   case WM_MOUSEMOVE: {
-    ns::InputManager::process_mouse_move(GET_X_LPARAM(l_param),
-                                         GET_Y_LPARAM(l_param));
+    InputManager::process_mouse_move(GET_X_LPARAM(l_param),
+                                     GET_Y_LPARAM(l_param));
   } break;
   case WM_MOUSEWHEEL: {
     i32 z_delta = GET_WHEEL_DELTA_WPARAM(w_param);
     if (z_delta != 0) {
-      ns::InputManager::process_mouse_wheel((z_delta < 0) ? -1 : 1);
+      InputManager::process_mouse_wheel((z_delta < 0) ? -1 : 1);
     }
   } break;
   case WM_LBUTTONDOWN:
@@ -282,12 +286,14 @@ LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param,
     }
 
     if (mouse_button != NSB_MAX_BUTTONS) {
-      ns::InputManager::process_button(mouse_button, pressed);
+      InputManager::process_button(mouse_button, pressed);
     }
   } break;
   }
 
   return DefWindowProcA(hwnd, msg, w_param, l_param);
 }
+
+} // namespace ns::platform
 
 #endif // NS_PLATFORM_WINDOWS

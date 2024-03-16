@@ -1,19 +1,19 @@
 #include "./test_manager.h"
 
-#include <containers/vector.h>
+#include <containers/vec.h>
 #include <core/clock.h>
 #include <core/logger.h>
-#include <core/ns_string.h>
+#include <core/string.h>
 
 struct test_entry {
   PFN_test func;
   cstr desc;
 };
 
-static ns::vector<test_entry> tests;
+static ns::Vec<test_entry> tests;
 
 void test_manager_register_test(u8 (*fn)(), cstr desc) {
-  tests.push_back({fn, desc});
+  tests.push({fn, desc});
 }
 
 void test_manager_run_tests() {
@@ -21,7 +21,7 @@ void test_manager_run_tests() {
   u32 failed = 0;
   u32 skipped = 0;
 
-  u32 count = static_cast<u32>(tests.size());
+  u32 count = static_cast<u32>(tests.len());
 
   ns::clock_t total_time;
   total_time.start();

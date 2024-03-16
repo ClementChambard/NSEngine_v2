@@ -1,10 +1,10 @@
 #include "./vulkan_backend.h"
 
-#include "../../containers/vector.h"
+#include "../../containers/vec.h"
 #include "../../core/application.h"
 #include "../../core/logger.h"
-#include "../../core/ns_string.h"
-#include "../../math/types/math_types.h"
+#include "../../core/string.h"
+#include "../../math/math.h"
 #include "./shaders/vulkan_material_shader.h"
 #include "./shaders/vulkan_ui_shader.h"
 #include "./vulkan_buffer.h"
@@ -76,14 +76,14 @@ bool backend_initialize(renderer_backend *backend, cstr application_name) {
   app_info.pEngineName = "NS Engine";
   app_info.engineVersion = VK_MAKE_VERSION(2, 0, 0);
 
-  ns::vector<cstr> required_extensions{};
-  required_extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-  platform_get_required_extension_names(&required_extensions);
+  Vec<cstr> required_extensions{};
+  required_extensions.push(VK_KHR_SURFACE_EXTENSION_NAME);
+  platform::get_required_extension_names(&required_extensions);
 
-  ns::vector<cstr> required_validation_layers{};
+  Vec<cstr> required_validation_layers{};
 
 #if defined(_DEBUG)
-  required_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+  required_extensions.push(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
   NS_DEBUG("Required extensions: ");
   for (auto &s : required_extensions) {
@@ -91,15 +91,17 @@ bool backend_initialize(renderer_backend *backend, cstr application_name) {
   }
 
   NS_INFO("Validation layers enabled. Enumerating...");
-  required_validation_layers.push_back("VK_LAYER_KHRONOS_validation");
+  required_validation_layers.push("VK_LAYER_KHRONOS_validation");
+  // Dump all vk calls
+  // required_validation_layers.push("VK_LAYER_LUNARG_api_dump");
 
   u32 available_layer_count = 0;
   VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, nullptr));
-  ns::vector<VkLayerProperties> available_layers(available_layer_count);
+  Vec<VkLayerProperties> available_layers(available_layer_count);
   VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count,
                                               available_layers.data()));
 
-  for (usize i = 0; i < required_validation_layers.size(); i++) {
+  for (usize i = 0; i < required_validation_layers.len(); i++) {
     NS_INFO("Searching for layer: %s...", required_validation_layers[i]);
     bool found = false;
     for (u32 j = 0; j < available_layer_count; j++) {
@@ -123,9 +125,9 @@ bool backend_initialize(renderer_backend *backend, cstr application_name) {
   VkInstanceCreateInfo create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   create_info.pApplicationInfo = &app_info;
-  create_info.enabledExtensionCount = required_extensions.size();
+  create_info.enabledExtensionCount = required_extensions.len();
   create_info.ppEnabledExtensionNames = required_extensions.data();
-  create_info.enabledLayerCount = required_validation_layers.size();
+  create_info.enabledLayerCount = required_validation_layers.len();
   create_info.ppEnabledLayerNames = required_validation_layers.data();
 
   VK_CHECK(
@@ -159,7 +161,7 @@ bool backend_initialize(renderer_backend *backend, cstr application_name) {
 #endif
 
   NS_DEBUG("Creating Vulkan surface...");
-  if (!platform_create_vulkan_surface(&context)) {
+  if (!platform::create_vulkan_surface(&context)) {
     NS_ERROR("Failed to create platform surface");
     return false;
   }
@@ -252,8 +254,8 @@ void backend_shutdown(renderer_backend * /* backend */) {
     vkDestroyFence(context.device, context.in_flight_fences[i],
                    context.allocator);
   }
-  vector<VkSemaphore>().swap(context.image_available_semaphores);
-  vector<VkSemaphore>().swap(context.queue_complete_semaphores);
+  context.image_available_semaphores.free();
+  context.queue_complete_semaphores.free();
 
   for (u32 i = 0; i < context.swapchain.image_count; i++) {
     if (context.graphics_command_buffers[i].handle) {
@@ -261,7 +263,7 @@ void backend_shutdown(renderer_backend * /* backend */) {
                           &context.graphics_command_buffers[i]);
     }
   }
-  vector<CommandBuffer>().swap(context.graphics_command_buffers);
+  context.graphics_command_buffers.free();
 
   for (u32 i = 0; i < context.swapchain.image_count; i++) {
     vkDestroyFramebuffer(context.device, context.world_framebuffers[i],
@@ -654,7 +656,7 @@ bool create_buffers(Context *context) {
 
 void backend_create_texture(robytes pixels, Texture *texture) {
   // TODO(ClementChambard): Use an allocator for this
-  texture->internal_data = ns::alloc(sizeof(TextureData), mem_tag::TEXTURE);
+  texture->internal_data = ns::alloc(sizeof(TextureData), MemTag::TEXTURE);
   TextureData *texture_data =
       reinterpret_cast<TextureData *>(texture->internal_data);
 
@@ -739,7 +741,7 @@ void backend_destroy_texture(Texture *texture) {
   vkDestroySampler(context.device, texture_data->sampler, context.allocator);
   texture_data->sampler = VK_NULL_HANDLE;
 
-  ns::free(texture->internal_data, sizeof(TextureData), mem_tag::TEXTURE);
+  ns::free(texture->internal_data, sizeof(TextureData), MemTag::TEXTURE);
   mem_zero(texture, sizeof(Texture));
 }
 

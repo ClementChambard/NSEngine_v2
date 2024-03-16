@@ -1,4 +1,4 @@
-#include "./ns_math.h"
+#include "./math.h"
 #include "../platform/platform.h"
 
 #include <math.h>
@@ -16,7 +16,7 @@ f32 abs(f32 x) { return fabsf(x); }
 
 i32 rand() {
   if (!rand_seeded) {
-    srand(static_cast<u32>(platform_get_absolute_time()));
+    srand(static_cast<u32>(platform::get_absolute_time()));
     rand_seeded = true;
   }
   return ::rand();
@@ -24,7 +24,7 @@ i32 rand() {
 
 i32 randrange(i32 min, i32 max) {
   if (!rand_seeded) {
-    srand(static_cast<u32>(platform_get_absolute_time()));
+    srand(static_cast<u32>(platform::get_absolute_time()));
     rand_seeded = true;
   }
   return (ns::rand() % (max - min + 1)) + min;

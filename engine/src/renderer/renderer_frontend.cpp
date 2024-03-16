@@ -3,15 +3,9 @@
 
 #include "../core/logger.h"
 
-#include "../math/ns_math.h"
+#include "../math/math.h"
 
 #include "../resources/resource_types.h"
-
-// TODO(ClementChambard): Temp
-#include "../core/event.h"
-#include "../systems/material_system.h"
-#include "../systems/texture_system.h"
-// TODO(ClementChambard): EndTemp
 
 namespace ns {
 

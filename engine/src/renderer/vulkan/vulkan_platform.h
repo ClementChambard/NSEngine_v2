@@ -1,15 +1,19 @@
 #ifndef VULKAN_PLATFORM_HEADER_INCLUDED
 #define VULKAN_PLATFORM_HEADER_INCLUDED
 
-#include "../../containers/vector.h"
+#include "../../containers/vec.h"
 #include "../../defines.h"
 
 namespace ns::vulkan {
 struct Context;
 }
 
-void platform_get_required_extension_names(ns::vector<cstr> *names_darray);
+namespace ns::platform {
 
-bool platform_create_vulkan_surface(ns::vulkan::Context *context);
+void get_required_extension_names(Vec<cstr> *names_darray);
+
+bool create_vulkan_surface(vulkan::Context *context);
+
+} // namespace ns::platform
 
 #endif // VULKAN_PLATFORM_HEADER_INCLUDED

@@ -1,7 +1,7 @@
 #include "./vulkan_buffer.h"
 
 #include "../../core/logger.h"
-#include "../../core/ns_memory.h"
+#include "../../core/memory.h"
 #include "./vulkan_buffer.h"
 #include "./vulkan_command_buffer.h"
 #include "./vulkan_utils.h"

@@ -2,8 +2,8 @@
 
 #include "../containers/hashtable.h"
 #include "../core/logger.h"
-#include "../core/ns_string.h"
-#include "../math/ns_math.h"
+#include "../core/string.h"
+#include "../math/math.h"
 #include "../renderer/renderer_frontend.h"
 #include "./texture_system.h"
 

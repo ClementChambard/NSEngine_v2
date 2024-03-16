@@ -2,8 +2,8 @@
 #define NS_QUAT_HEADER_INCLUDED
 
 #include "../../defines.h"
-#include "../ns_cstes.h"
-#include "./mat/ns_mat4.h"
+#include "../cstes.h"
+#include "./mat/mat4.h"
 
 namespace ns {
 

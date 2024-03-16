@@ -1,6 +1,6 @@
 #include "./vulkan_command_buffer.h"
 
-#include "../../core/ns_memory.h"
+#include "../../core/memory.h"
 
 namespace ns::vulkan {
 

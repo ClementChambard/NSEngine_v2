@@ -1,7 +1,7 @@
 #include "./resource_system.h"
 
-#include "../core/ns_memory.h"
-#include "../core/ns_string.h"
+#include "../core/memory.h"
+#include "../core/string.h"
 
 #include "../resources/loaders/binary_loader.h"
 #include "../resources/loaders/image_loader.h"

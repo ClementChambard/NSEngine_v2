@@ -1,7 +1,7 @@
 #ifndef RESOURCE_TYPES_HEADER_INCLUDED
 #define RESOURCE_TYPES_HEADER_INCLUDED
 
-#include "../math/types/math_types.h"
+#include "../math/math.h"
 
 namespace ns {
 
@@ -17,7 +17,7 @@ enum class ResourceType {
 struct Resource {
   u32 loader_id;
   cstr name;
-  str full_path;
+  pstr full_path;
   usize data_size;
   ptr data;
 };

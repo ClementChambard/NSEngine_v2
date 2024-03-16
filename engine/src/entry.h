@@ -20,12 +20,12 @@ int main(void) {
     return -2;
   }
 
-  if (!application_create(&game_inst)) {
+  if (!ns::application_create(&game_inst)) {
     NS_INFO("Application failed to create!");
     return 1;
   }
 
-  if (!application_run()) {
+  if (!ns::application_run()) {
     NS_INFO("Application did not shutdown gracefully!");
     return 2;
   }

@@ -1,5 +1,5 @@
 #include "./game.h"
-#include <core/ns_memory.h>
+#include <core/memory.h>
 
 #include <entry.h>
 
@@ -15,7 +15,7 @@ bool create_game(game *out_game) {
   out_game->render = game_render;
   out_game->on_resize = game_on_resize;
 
-  out_game->state = ns::alloc(sizeof(game_state), ns::mem_tag::GAME);
+  out_game->state = alloc(sizeof(game_state), ns::MemTag::GAME);
   out_game->application_state = 0;
 
   return true;

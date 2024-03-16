@@ -1,7 +1,6 @@
 #include "./input.h"
 #include "./event.h"
-#include "./logger.h"
-#include "./ns_memory.h"
+#include "./memory.h"
 
 namespace ns {
 

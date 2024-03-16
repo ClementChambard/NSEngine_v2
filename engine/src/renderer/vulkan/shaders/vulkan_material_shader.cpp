@@ -1,7 +1,7 @@
 #include "./vulkan_material_shader.h"
 
 #include "../../../core/logger.h"
-#include "../../../math/ns_math.h"
+#include "../../../math/math.h"
 #include "../vulkan_buffer.h"
 #include "../vulkan_pipeline.h"
 #include "../vulkan_shader_utils.h"

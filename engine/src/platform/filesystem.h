@@ -66,7 +66,7 @@ NS_API bool fsize(File *handle, usize *out_size);
  * @param out_line_length The length of the line
  * @returns True if the line was read successfully
  */
-NS_API bool read_line(File *handle, usize max_length, str *line_buf,
+NS_API bool read_line(File *handle, usize max_length, pstr *line_buf,
                       u64 *out_line_length);
 
 /**
@@ -105,7 +105,7 @@ NS_API bool read_all_bytes(File *handle, bytes out_bytes,
  * @param out_bytes_read The number of bytes read
  * @returns True if the text was read successfully
  */
-NS_API bool read_all_text(File *handle, str out_text, usize *out_bytes_read);
+NS_API bool read_all_text(File *handle, pstr out_text, usize *out_bytes_read);
 
 /**
  * Writes data to a file

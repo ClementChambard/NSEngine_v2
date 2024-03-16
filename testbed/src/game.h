@@ -3,7 +3,7 @@
 
 #include <defines.h>
 #include <game_types.h>
-#include <math/ns_math.h>
+#include <math/math.h>
 
 struct game_state {
   f32 delta_time;

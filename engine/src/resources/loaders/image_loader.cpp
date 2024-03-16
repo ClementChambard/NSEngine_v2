@@ -1,8 +1,8 @@
 #include "./image_loader.h"
 
 #include "../../core/logger.h"
-#include "../../core/ns_memory.h"
-#include "../../core/ns_string.h"
+#include "../../core/memory.h"
+#include "../../core/string.h"
 #include "../../systems/resource_system.h"
 #include "../resource_types.h"
 #include "./loader_utils.h"
@@ -53,7 +53,7 @@ bool image_loader_load(resource_loader *self, cstr name,
   out_resource->full_path = string_dup(full_file_path);
 
   ImageResourceData *resource_data = reinterpret_cast<ImageResourceData *>(
-      ns::alloc(sizeof(ImageResourceData), mem_tag::TEXTURE));
+      ns::alloc(sizeof(ImageResourceData), MemTag::TEXTURE));
   resource_data->width = width;
   resource_data->height = height;
   resource_data->channel_count = channel_count;
@@ -75,13 +75,13 @@ void image_loader_unload(resource_loader *self, Resource *resource) {
   i32 path_length = string_length(resource->full_path);
   if (path_length) {
     ns::free(resource->full_path, sizeof(char) * path_length + 1,
-             mem_tag::STRING);
+             MemTag::STRING);
   }
 
   if (resource->data) {
     stbi_image_free(
         reinterpret_cast<ImageResourceData *>(resource->data)->pixels);
-    ns::free(resource->data, resource->data_size, mem_tag::TEXTURE);
+    ns::free(resource->data, resource->data_size, MemTag::TEXTURE);
     resource->data = nullptr;
     resource->data_size = 0;
     resource->loader_id = INVALID_ID;

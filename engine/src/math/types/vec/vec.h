@@ -1,9 +1,9 @@
 #ifndef NS_VEC_HEADER_INCLUDED
 #define NS_VEC_HEADER_INCLUDED
 
-#include "./ns_vec2.h"
-#include "./ns_vec3.h"
-#include "./ns_vec4.h"
+#include "./vec2.h"
+#include "./vec3.h"
+#include "./vec4.h"
 
 namespace ns {
 

@@ -1,7 +1,7 @@
 #ifndef VULKAN_TYPES_INLINE_INCLUDED
 #define VULKAN_TYPES_INLINE_INCLUDED
 
-#include "../../containers/vector.h"
+#include "../../containers/vec.h"
 #include "../../core/asserts.h"
 #include "../../defines.h"
 #include "../renderer_types.inl"
@@ -304,10 +304,10 @@ struct Context {
   Buffer object_vertex_buffer;
   Buffer object_index_buffer;
 
-  vector<CommandBuffer> graphics_command_buffers;
+  Vec<CommandBuffer> graphics_command_buffers;
 
-  vector<VkSemaphore> image_available_semaphores;
-  vector<VkSemaphore> queue_complete_semaphores;
+  Vec<VkSemaphore> image_available_semaphores;
+  Vec<VkSemaphore> queue_complete_semaphores;
   u32 in_flight_fence_count;
   VkFence in_flight_fences[2];
   VkFence *images_in_flight[3];

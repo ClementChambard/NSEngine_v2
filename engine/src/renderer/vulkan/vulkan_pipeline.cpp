@@ -1,6 +1,6 @@
 #include "./vulkan_pipeline.h"
 #include "../../core/logger.h"
-#include "../../math/types/math_types.h"
+#include "../../math/math.h"
 #include "./vulkan_utils.h"
 
 namespace ns::vulkan {

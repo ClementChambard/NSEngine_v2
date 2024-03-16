@@ -7,7 +7,7 @@ namespace ns {
 
 struct resource_loader;
 
-void resource_unload(resource_loader *self, Resource *resource, mem_tag tag);
+void resource_unload(resource_loader *self, Resource *resource, MemTag tag);
 
 } // namespace ns
 

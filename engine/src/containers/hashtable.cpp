@@ -1,7 +1,7 @@
 #include "./hashtable.h"
 
 #include "../core/logger.h"
-#include "../core/ns_memory.h"
+#include "../core/memory.h"
 
 static u64 hash_name(cstr name, u32 element_count) {
   static const u64 multiplier = 97;
