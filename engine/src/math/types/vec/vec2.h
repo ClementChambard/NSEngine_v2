@@ -1,7 +1,7 @@
 #ifndef NS_VEC2_HEADER_INCLUDED
 #define NS_VEC2_HEADER_INCLUDED
 
-#include "../../../core/string.h"
+#include "../../../core/string/cstring.h"
 #include "../../../defines.h"
 #include "../../cstes.h"
 

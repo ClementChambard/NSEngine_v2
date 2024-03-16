@@ -99,7 +99,7 @@ bool backend_initialize(renderer_backend *backend, cstr application_name) {
   VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, nullptr));
   Vec<VkLayerProperties> available_layers(available_layer_count);
   VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count,
-                                              available_layers.data()));
+                                              available_layers));
 
   for (usize i = 0; i < required_validation_layers.len(); i++) {
     NS_INFO("Searching for layer: %s...", required_validation_layers[i]);
@@ -126,9 +126,9 @@ bool backend_initialize(renderer_backend *backend, cstr application_name) {
   create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   create_info.pApplicationInfo = &app_info;
   create_info.enabledExtensionCount = required_extensions.len();
-  create_info.ppEnabledExtensionNames = required_extensions.data();
+  create_info.ppEnabledExtensionNames = required_extensions;
   create_info.enabledLayerCount = required_validation_layers.len();
-  create_info.ppEnabledLayerNames = required_validation_layers.data();
+  create_info.ppEnabledLayerNames = required_validation_layers;
 
   VK_CHECK(
       vkCreateInstance(&create_info, context.allocator, &context.instance));

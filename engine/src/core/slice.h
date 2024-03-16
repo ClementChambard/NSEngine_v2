@@ -1,3 +1,10 @@
+/**
+ * @file slice.h
+ * @brief Contains the Slice class.
+ * @author Clement Chambard
+ * @date 2024
+ */
+
 #ifndef SLICE_HEADER_INCLUDED
 #define SLICE_HEADER_INCLUDED
 
@@ -5,47 +12,99 @@
 
 namespace ns {
 
-/**
- * A slice is a view of an array of T
+/** @class Slice
+ * @brief A slice is a view for array data.
+ * @tparam T the type of the array.
  */
 template <typename T> struct Slice {
-  Slice(Slice const &) = default;
-  static Slice from_parts(T const *data, usize count) {
+  NS_API Slice(Slice const &) = default;
+
+  /**
+   * @brief Creates a slice from a C array.
+   * @param data the C array.
+   * @param count the number of elements.
+   */
+  NS_API static Slice from_parts(T const *data, usize count) {
     Slice slice;
     slice.m_data = data;
     slice.m_count = count;
     return slice;
   }
 
-  Slice sub(usize start, usize end) {
+  /**
+   * @brief Get a sub slice from inside the current slice.
+   * @param start the start index of the sub slice.
+   *        There is no bound checking on this value.
+   * @param end the end index of the sub slice
+   *        There is no bound checking on this value.
+   * @return the slice.
+   */
+  NS_API Slice sub(usize start, usize end) {
     Slice slice;
     slice.m_data = m_data + start;
     slice.m_count = end - start;
     return slice;
   }
 
-  Slice sub(usize start) {
+  /**
+   * @brief Get a sub slice until the end of the current slice.
+   * @param start the start index of the sub slice.
+   *        There is no bound checking on this value.
+   * @return the slice.
+   */
+  NS_API Slice sub(usize start) {
     Slice slice;
     slice.m_data = m_data + start;
     slice.m_count = m_count - start;
     return slice;
   }
 
-  Slice firsts(usize count) {
+  /**
+   * @brief Get a sub slice from the start of the current slice.
+   * @param count the number of elements in the slice.
+   *        There is no bound checking on this value.
+   * @return the slice.
+   */
+  NS_API Slice firsts(usize count) {
     Slice slice;
     slice.m_data = m_data;
     slice.m_count = count;
     return slice;
   }
 
-  T const &operator[](usize index) const { return m_data[index]; }
+  /**
+   * @brief Get the element at the given index.
+   * @param index the index of the element.
+   *        There is no bound checking on this value.
+   */
+  NS_API T const &operator[](usize index) const { return m_data[index]; }
 
-  operator T const *() const { return m_data; }
+  /**
+   * @brief Convertion to a C array.
+   */
+  NS_API operator T const *() const { return m_data; }
 
-  T const *begin() const { return m_data; }
-  T const *end() const { return m_data + m_count; }
+  /**
+   * @brief Get the begin iterator of the slice.
+   * @return the begin iterator of the slice.
+   */
+  NS_API T const *begin() const { return m_data; }
 
-  bool operator==(Slice const &other) const {
+  /**
+   * @brief Get the end iterator of the slice.
+   * @return the end iterator of the slice.
+   */
+  NS_API T const *end() const { return m_data + m_count; }
+
+  /**
+   * @brief Comparison operator for slices.
+   * @param other the other slice.
+   *
+   * @return true if the slices are equal:
+   *   - the count is the same
+   *   - the values are the same
+   */
+  NS_API bool operator==(Slice const &other) const {
     if (m_count != other.m_count) {
       return false;
     }
@@ -61,9 +120,21 @@ template <typename T> struct Slice {
     return true;
   }
 
-  bool operator!=(Slice const &other) const { return !(*this == other); }
+  /**
+   * @brief Comparison operator for slices.
+   * @param other the other slice.
+   *
+   * @return true if the slices are not equal:
+   *   - the count is the same
+   *   - the values are the same
+   */
+  NS_API bool operator!=(Slice const &other) const { return !(*this == other); }
 
-  usize len() const { return m_count; }
+  /**
+   * @brief Get the number of elements in the slice.
+   * @return the number of elements in the slice.
+   */
+  NS_API usize len() const { return m_count; }
 
 protected:
   T const *m_data;
