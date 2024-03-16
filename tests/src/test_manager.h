@@ -4,6 +4,7 @@
 #include <defines.h>
 
 #define BYPASS 2
+#define UNIMPLEMENTED 3
 
 typedef u8 (*PFN_test)();
 

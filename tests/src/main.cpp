@@ -1,5 +1,6 @@
 #include "./test_manager.h"
 
+#include "./containers/freelist_tests.h"
 #include "./containers/hashtable_tests.h"
 #include "./memory/linear_allocator_tests.h"
 
@@ -10,6 +11,7 @@ int main() {
 
   linear_allocator_register_tests();
   hashtable_register_tests();
+  freelist_register_tests();
 
   test_manager_run_tests();
 

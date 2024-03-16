@@ -1,0 +1,6 @@
+#ifndef FREELIST_TESTS_HEADER_INCLUDED
+#define FREELIST_TESTS_HEADER_INCLUDED
+
+void freelist_register_tests();
+
+#endif // FREELIST_TESTS_HEADER_INCLUDED

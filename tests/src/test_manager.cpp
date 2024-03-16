@@ -37,6 +37,9 @@ void test_manager_run_tests() {
     } else if (result == BYPASS) {
       NS_WARN("[SKIPPED]: %s", tests[i].desc);
       skipped++;
+    } else if (result == UNIMPLEMENTED) {
+      NS_WARN("[UNIMPLEMENTED]: %s (skipped)", tests[i].desc);
+      skipped++;
     } else {
       NS_ERROR("[FAILED]: %s", tests[i].desc);
       failed++;
