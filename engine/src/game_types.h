@@ -17,6 +17,8 @@ struct game {
   ptr state;
 
   ptr application_state;
+
+  usize state_memory_requirement;
 };
 
 #endif // GAME_TYPES_HEADER_INCLUDED

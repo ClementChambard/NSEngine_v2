@@ -15,7 +15,7 @@ bool create_game(game *out_game) {
   out_game->render = game_render;
   out_game->on_resize = game_on_resize;
 
-  out_game->state = alloc(sizeof(game_state), ns::MemTag::GAME);
+  out_game->state_memory_requirement = sizeof(game_state);
   out_game->application_state = 0;
 
   return true;

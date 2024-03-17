@@ -1,5 +1,6 @@
 #include "./memory.h"
 
+#include "../memory/dynamic_allocator.h"
 #include "../platform/platform.h"
 #include "./logger.h"
 #include <cstdio>
@@ -22,23 +23,56 @@ static cstr memory_tag_strings[static_cast<usize>(MemTag::MAX_TAGS)] = {
 };
 
 struct memory_system_state {
+  memory_system_configuration config;
   struct memory_stats stats;
   u64 alloc_count;
+  usize allocator_memory_requirement;
+  dynamic_allocator allocator;
+  void *allocator_block;
 };
 
 static memory_system_state *state_ptr;
 
-void memory_system_initialize(usize *memory_requirement, ptr state) {
-  *memory_requirement = sizeof(memory_system_state);
-  if (state == nullptr) {
-    return;
+bool memory_system_initialize(memory_system_configuration config) {
+  usize state_memory_requirement = sizeof(memory_system_state);
+  usize alloc_requirement = 0;
+  dynamic_allocator_create(config.total_alloc_size, &alloc_requirement, 0, 0);
+  ptr block = platform::allocate_memory(
+      state_memory_requirement + alloc_requirement, false);
+  if (!block) {
+    NS_FATAL("Memory system allocation failed and the system cannot continue.");
+    return false;
   }
-  state_ptr = reinterpret_cast<memory_system_state *>(state);
+
+  state_ptr = reinterpret_cast<memory_system_state *>(block);
+  state_ptr->config = config;
+  state_ptr->stats = {};
   state_ptr->alloc_count = 0;
-  platform::zero_memory(&state_ptr->stats, sizeof(memory_stats));
+  state_ptr->allocator_memory_requirement = alloc_requirement;
+  platform::zero_memory(&state_ptr->stats, sizeof(state_ptr->stats));
+  state_ptr->allocator_block =
+      reinterpret_cast<u8 *>(block) + state_memory_requirement;
+  if (!dynamic_allocator_create(
+          config.total_alloc_size, &state_ptr->allocator_memory_requirement,
+          state_ptr->allocator_block, &state_ptr->allocator)) {
+    NS_FATAL("Memory system is unable to setup internal allocator. Application "
+             "cannot continue.");
+    return false;
+  }
+
+  NS_DEBUG("Memory system successfully allocated %llu bytes.",
+           config.total_alloc_size);
+  return true;
 }
 
-void memory_system_shutdown(ptr /*state*/) { state_ptr = nullptr; }
+void memory_system_shutdown() {
+  if (state_ptr) {
+    dynamic_allocator_destroy(&state_ptr->allocator);
+    platform::free_memory(state_ptr, state_ptr->allocator_memory_requirement +
+                                         sizeof(memory_system_state));
+    state_ptr = nullptr;
+  }
+}
 
 ptr alloc(usize size, MemTag tag) {
   if (tag == MemTag::UNKNOWN) {
@@ -46,17 +80,24 @@ ptr alloc(usize size, MemTag tag) {
             "allocation.");
   }
 
+  ptr block = nullptr;
   if (state_ptr) {
     state_ptr->stats.total_allocated += size;
     state_ptr->stats.tagged_allocations[static_cast<usize>(tag)] += size;
     state_ptr->alloc_count++;
+    block = dynamic_allocator_allocate(&state_ptr->allocator, size);
+  } else {
+    NS_WARN("ns::alloc called before the memory system is initialized.");
+    block = platform::allocate_memory(size, false);
   }
 
-  // TODO(ClementChambard): memory alignment
-  ptr block = platform::allocate_memory(size, false);
-  platform::zero_memory(block, size);
+  if (block) {
+    platform::zero_memory(block, size);
+    return block;
+  }
 
-  return block;
+  NS_FATAL("ns::alloc failed to allocate successfully.");
+  return 0;
 }
 
 NS_API ptr realloc(ptr block, usize prev_size, usize new_size, MemTag tag) {
@@ -65,13 +106,19 @@ NS_API ptr realloc(ptr block, usize prev_size, usize new_size, MemTag tag) {
             "reallocation.");
   }
 
+  ptr new_block = nullptr;
   if (state_ptr) {
     isize s_diff = new_size - prev_size;
     state_ptr->stats.total_allocated += s_diff;
     state_ptr->stats.tagged_allocations[static_cast<usize>(tag)] += s_diff;
+    new_block = dynamic_allocator_reallocate(&state_ptr->allocator, block,
+                                             prev_size, new_size);
+  } else {
+    NS_WARN("ns::realloc called before the memory system is initialized.");
+    new_block = platform::reallocate_memory(block, new_size, false);
   }
 
-  return platform::reallocate_memory(block, new_size, false);
+  return new_block;
 }
 
 void free(ptr block, usize size, MemTag tag) {
@@ -83,10 +130,14 @@ void free(ptr block, usize size, MemTag tag) {
   if (state_ptr) {
     state_ptr->stats.total_allocated -= size;
     state_ptr->stats.tagged_allocations[static_cast<usize>(tag)] -= size;
+    bool result = dynamic_allocator_free(&state_ptr->allocator, block, size);
+    if (!result) { // block was not created with the dynamic_allocator
+      platform::free_memory(block, false);
+    }
+  } else {
+    // TODO(ClementChambard): memory alignment
+    platform::free_memory(block, false);
   }
-
-  // TODO(ClementChambard): memory alignment
-  platform::free_memory(block, false);
 }
 
 ptr mem_zero(ptr block, usize size) {

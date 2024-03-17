@@ -37,9 +37,6 @@ struct application_state {
   u64 event_system_memory_requirement;
   ptr event_system_state;
 
-  u64 memory_system_memory_requirement;
-  ptr memory_system_state;
-
   u64 logging_system_memory_requirement;
   ptr logging_system_state;
 
@@ -116,6 +113,16 @@ bool application_create(game *game_inst) {
     return false;
   }
 
+  memory_system_configuration memory_config{};
+  memory_config.total_alloc_size = 1024 * 1024 * 1024;
+  if (!memory_system_initialize(memory_config)) {
+    NS_ERROR("Failed to initialize memory system; shutting down.");
+    return false;
+  }
+
+  game_inst->state =
+      ns::alloc(game_inst->state_memory_requirement, MemTag::GAME);
+
   game_inst->application_state =
       ns::alloc(sizeof(application_state), MemTag::APPLICATION);
   app_state =
@@ -128,13 +135,6 @@ bool application_create(game *game_inst) {
       linear_allocator(systems_allocator_total_size, nullptr);
 
   // initialize subsystems
-  memory_system_initialize(&app_state->memory_system_memory_requirement,
-                           nullptr);
-  app_state->memory_system_state = app_state->systems_allocator.allocate(
-      app_state->memory_system_memory_requirement);
-  memory_system_initialize(&app_state->memory_system_memory_requirement,
-                           app_state->memory_system_state);
-
   event_system_initialize(&app_state->event_system_memory_requirement, nullptr);
   app_state->event_system_state = app_state->systems_allocator.allocate(
       app_state->event_system_memory_requirement);
@@ -377,9 +377,16 @@ bool application_run() {
 
   event_system_shutdown(app_state->event_system_state);
 
+  app_state->systems_allocator.~linear_allocator();
+
+  game *game_inst = app_state->game_inst;
+  ns::free(app_state, sizeof(application_state), MemTag::APPLICATION);
+
+  ns::free(game_inst->state, game_inst->state_memory_requirement, MemTag::GAME);
+
   NS_TRACE(get_memory_usage_str());
 
-  memory_system_shutdown(app_state->memory_system_state);
+  memory_system_shutdown();
 
   return true;
 }

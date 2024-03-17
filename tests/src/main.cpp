@@ -12,6 +12,7 @@ int main() {
   linear_allocator_register_tests();
   hashtable_register_tests();
   freelist_register_tests();
+  NS_WARN("Dynamic allocator tests not implemented. TODO!");
 
   test_manager_run_tests();
 

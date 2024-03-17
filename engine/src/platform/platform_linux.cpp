@@ -29,6 +29,8 @@
 #include <unistd.h>
 #endif
 
+// #define TRACK_PLATFORM_ALLOCATIONS
+
 namespace ns::platform {
 
 struct platform_state {
@@ -209,14 +211,25 @@ bool pump_messages() {
 }
 
 ptr allocate_memory(usize size, bool /* aligned */) {
+#ifdef TRACK_PLATFORM_ALLOCATIONS
+  NS_TRACE("Platform allocation of size %lluB", size);
+#endif
   return std::malloc(size);
 }
 
 ptr reallocate_memory(ptr block, usize new_size, bool /* aligned */) {
+#ifdef TRACK_PLATFORM_ALLOCATIONS
+  NS_TRACE("Platform reallocation of size %lluB", new_size);
+#endif
   return std::realloc(block, new_size);
 }
 
-void free_memory(ptr block, bool /* aligned */) { std::free(block); }
+void free_memory(ptr block, bool /* aligned */) {
+#ifdef TRACK_PLATFORM_ALLOCATIONS
+  NS_TRACE("Platform free");
+#endif
+  std::free(block);
+}
 
 ptr zero_memory(ptr block, usize size) { return std::memset(block, 0, size); }
 

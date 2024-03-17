@@ -28,9 +28,13 @@ enum class MemTag {
   MAX_TAGS
 };
 
-NS_API void memory_system_initialize(usize *memory_requirement, ptr state);
+struct memory_system_configuration {
+  u64 total_alloc_size;
+};
 
-NS_API void memory_system_shutdown(ptr state);
+NS_API bool memory_system_initialize(memory_system_configuration config);
+
+NS_API void memory_system_shutdown();
 
 /**
  * Allocate a block of memory

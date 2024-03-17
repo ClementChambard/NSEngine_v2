@@ -65,7 +65,7 @@ void freelist_destroy(freelist *list) {
   }
 }
 
-bool freelist_allocate_block(freelist list, u32 size, u32 *out_offset) {
+bool freelist_allocate_block(freelist list, usize size, u64 *out_offset) {
   if (!out_offset || !list.memory) {
     return false;
   }
@@ -101,13 +101,31 @@ bool freelist_allocate_block(freelist list, u32 size, u32 *out_offset) {
   return false;
 }
 
-bool freelist_free_block(freelist list, u32 size, u32 offset) {
+NS_API bool freelist_try_reallocate_block(freelist list, usize /*old_size*/,
+                                          usize new_size, u64 /*offset*/,
+                                          u64 *new_offset) {
+  // TODO
+
+  // in the meantime, just allocate a new block
+  freelist_allocate_block(list, new_size, new_offset);
+  return false;
+}
+
+bool freelist_free_block(freelist list, usize size, u64 offset) {
   if (!list.memory || !size) {
     return false;
   }
   internal_state *state = reinterpret_cast<internal_state *>(list.memory);
   freelist_node *node = state->head;
   freelist_node *prev = nullptr;
+  if (!node) {
+    freelist_node *new_node = get_node(list);
+    new_node->offset = offset;
+    new_node->size = size;
+    new_node->next = nullptr;
+    state->head = new_node;
+    return true;
+  }
   while (node) {
     if (node->offset == offset) {
       node->size += size;

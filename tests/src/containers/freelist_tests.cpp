@@ -36,7 +36,7 @@ u8 freelist_should_allocate_one_and_free_one() {
   void *block = ns::alloc(mem_req, ns::MemTag::APPLICATION);
   ns::freelist_create(tot_siz, &mem_req, block, &list);
 
-  u32 offset = INVALID_ID;
+  u64 offset = INVALID_ID;
   bool result = ns::freelist_allocate_block(list, 64, &offset);
   expect_true(result);
   expect(0, offset);
@@ -64,15 +64,15 @@ u8 freelist_should_allocate_one_and_free_multi() {
   ns::freelist_create(tot_siz, &mem_req, nullptr, nullptr);
   void *block = ns::alloc(mem_req, ns::MemTag::APPLICATION);
   ns::freelist_create(tot_siz, &mem_req, block, &list);
-  u32 offset = INVALID_ID;
+  u64 offset = INVALID_ID;
   bool result = ns::freelist_allocate_block(list, 64, &offset);
   expect_true(result);
   expect(0, offset);
-  u32 offset2 = INVALID_ID;
+  u64 offset2 = INVALID_ID;
   result = ns::freelist_allocate_block(list, 64, &offset2);
   expect_true(result);
   expect(64, offset2);
-  u32 offset3 = INVALID_ID;
+  u64 offset3 = INVALID_ID;
   result = ns::freelist_allocate_block(list, 64, &offset3);
   expect_true(result);
   expect(128, offset3);
@@ -82,7 +82,7 @@ u8 freelist_should_allocate_one_and_free_multi() {
   expect_true(result);
   free_space = freelist_free_space(list);
   expect(tot_siz - 128, free_space);
-  u32 offset4 = INVALID_ID;
+  u64 offset4 = INVALID_ID;
   result = ns::freelist_allocate_block(list, 64, &offset4);
   expect_true(result);
   expect(offset2, offset4);
@@ -119,11 +119,11 @@ u8 freelist_should_allocate_to_full_and_fail_to_allocate_more() {
   ns::freelist_create(tot_siz, &mem_req, nullptr, nullptr);
   void *block = ns::alloc(mem_req, ns::MemTag::APPLICATION);
   ns::freelist_create(tot_siz, &mem_req, block, &list);
-  u32 offset = INVALID_ID;
+  u64 offset = INVALID_ID;
   bool result = ns::freelist_allocate_block(list, 512, &offset);
   expect_true(result);
   expect(0, offset);
-  u32 offset2 = INVALID_ID;
+  u64 offset2 = INVALID_ID;
   NS_DEBUG("The following warning message is intentional.");
   result = ns::freelist_allocate_block(list, 64, &offset2);
   expect_false(result);
