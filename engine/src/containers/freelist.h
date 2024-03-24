@@ -22,6 +22,10 @@ NS_API bool freelist_try_reallocate_block(freelist list, usize old_size,
 
 NS_API bool freelist_free_block(freelist list, usize size, u64 offset);
 
+NS_API bool freelist_resize(freelist list, usize *memory_requirement,
+                            ptr new_memory, usize new_size,
+                            ptr *out_old_memory);
+
 NS_API void freelist_clear(freelist list);
 
 NS_API usize freelist_free_space(freelist list);

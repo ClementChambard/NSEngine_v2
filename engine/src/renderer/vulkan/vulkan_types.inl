@@ -1,6 +1,7 @@
 #ifndef VULKAN_TYPES_INLINE_INCLUDED
 #define VULKAN_TYPES_INLINE_INCLUDED
 
+#include "../../containers/freelist.h"
 #include "../../containers/vec.h"
 #include "../../core/asserts.h"
 #include "../../defines.h"
@@ -31,6 +32,10 @@ struct Buffer {
   VkDeviceMemory memory;
   i32 memory_index;
   u32 memory_property_flags;
+
+  usize freelist_memory_requirement;
+  ptr freelist_block;
+  freelist buffer_freelist;
 
   operator VkBuffer() const { return handle; }
 };
@@ -171,10 +176,10 @@ struct GeometryData {
   NSID id;
   u32 generation;
   u32 vertex_count;
-  u32 vertex_buffer_offset;
+  u64 vertex_buffer_offset;
   u32 vertex_element_size;
   u32 index_count;
-  u32 index_buffer_offset;
+  u64 index_buffer_offset;
   u32 index_element_size;
 };
 
@@ -319,9 +324,6 @@ struct Context {
 
   MaterialShader material_shader;
   UiShader ui_shader;
-
-  usize geometry_vertex_offset;
-  usize geometry_index_offset;
 
   GeometryData geometries[MAX_GEOMETRY_COUNT];
 

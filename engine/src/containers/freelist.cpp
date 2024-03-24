@@ -177,6 +177,75 @@ bool freelist_free_block(freelist list, usize size, u64 offset) {
   return true;
 }
 
+NS_API bool freelist_resize(freelist list, usize *memory_requirement,
+                            ptr new_memory, usize new_size,
+                            ptr *out_old_memory) {
+  if (!memory_requirement ||
+      reinterpret_cast<internal_state *>(list.memory)->total_size > new_size) {
+    return false;
+  }
+
+  u64 max_entries = new_size / sizeof(ptr);
+  *memory_requirement =
+      sizeof(internal_state) + sizeof(freelist_node) * max_entries;
+  if (!new_memory) {
+    return true;
+  }
+
+  *out_old_memory = list.memory;
+  internal_state *old_state = reinterpret_cast<internal_state *>(list.memory);
+  usize size_diff = new_size - old_state->total_size;
+
+  list.memory = new_memory;
+
+  mem_zero(new_memory, *memory_requirement);
+
+  internal_state *state = reinterpret_cast<internal_state *>(list.memory);
+  state->nodes = reinterpret_cast<freelist_node *>(state + 1);
+  state->max_entries = max_entries;
+  state->total_size = new_size;
+
+  for (u64 i = 1; i < max_entries; i++) {
+    state->nodes[i].offset = INVALID_ID;
+    state->nodes[i].size = INVALID_ID;
+  }
+
+  state->head = &state->nodes[0];
+
+  freelist_node *new_list_node = state->head;
+  freelist_node *old_node = old_state->head;
+  if (!old_node) {
+    state->head->offset = old_state->total_size;
+    state->head->size = size_diff;
+    state->head->next = nullptr;
+  } else {
+    while (old_node) {
+      freelist_node *new_node = get_node(list);
+      new_node->offset = old_node->offset;
+      new_node->size = old_node->size;
+      new_node->next = nullptr;
+      new_list_node->next = new_node;
+      new_list_node = new_list_node->next;
+
+      if (old_node->next) {
+        old_node = old_node->next;
+      } else {
+        if (old_node->offset + old_node->size == old_state->total_size) {
+          new_node->size += size_diff;
+        } else {
+          freelist_node *new_node_end = get_node(list);
+          new_node_end->offset = old_state->total_size;
+          new_node_end->size = size_diff;
+          new_node_end->next = nullptr;
+          new_node->next = new_node_end;
+        }
+        break;
+      }
+    }
+  }
+  return true;
+}
+
 void freelist_clear(freelist list) {
   if (!list.memory) {
     return;

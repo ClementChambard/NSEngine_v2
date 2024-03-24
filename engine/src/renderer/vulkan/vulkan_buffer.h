@@ -20,6 +20,10 @@ ptr buffer_lock_memory(Context *context, Buffer *buffer, usize offset,
                        usize size, u32 flags);
 void buffer_unlock_memory(Context *context, Buffer *buffer);
 
+bool buffer_allocate(Buffer *buffer, u64 size, u64 *out_offset);
+
+bool buffer_free(Buffer *buffer, u64 size, u64 offset);
+
 void buffer_load_data(Context *context, Buffer *buffer, usize offset,
                       usize size, u32 flags, roptr data);
 

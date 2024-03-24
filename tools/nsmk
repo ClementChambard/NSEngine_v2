@@ -2,6 +2,9 @@
 
 # get the executable's path
 NSMK_PATH="$(dirname -- "${BASH_SOURCE[0]}")"
+NSMK_ARGS=("$@")
+
+source $NSMK_PATH/nsmk_git.sh
 
 # executable is in $NSENGINE_DEV_PATH/tools
 NSENGINE_DEV_PATH="$(dirname -- $NSMK_PATH)"
@@ -37,13 +40,11 @@ main() {
   fi
 }
 
-if [ $# -gt 1 ]; then
-  echo "Invalid number of args"
-  exit 1
-fi
-
 if [ $# -eq 0 ]; then
   main
+elif [ "$1" = "git" ]; then
+  git_cmd "${NSMK_ARGS[@]:1}"
+  exit $?
 elif [ $# -eq 1 ]; then
 
   if [ "$1" = "configure" ]; then
@@ -60,6 +61,11 @@ elif [ $# -eq 1 ]; then
     cd $NSENGINE_BUILD_DIR
     testbed/testbed
     exit $?
+  elif [ "$1" = "debug" ]; then
+    main
+    cd $NSENGINE_BUILD_DIR
+    gdb testbed/testbed
+    exit $?
   elif [ "$1" = "test" ]; then
     main
     cd $NSENGINE_BUILD_DIR
@@ -72,5 +78,7 @@ elif [ $# -eq 1 ]; then
     cd $NSENGINE_BUILD_DIR > /dev/null 2> /dev/null && ninja clean
     exit $?
   fi
-
+else
+  echo "Usage: nsmk <command>"
+  exit 1
 fi

@@ -8,6 +8,14 @@
 
 namespace ns::vulkan {
 
+void cleanup_freelist(Buffer *buffer) {
+  freelist_destroy(&buffer->buffer_freelist);
+  ns::free(buffer->freelist_block, buffer->freelist_memory_requirement,
+           MemTag::RENDERER);
+  buffer->freelist_block = nullptr;
+  buffer->freelist_memory_requirement = 0;
+}
+
 bool buffer_create(Context *context, usize size, VkBufferUsageFlagBits usage,
                    u32 memory_property_flags, bool bind_on_create,
                    Buffer *out_buffer) {
@@ -15,6 +23,14 @@ bool buffer_create(Context *context, usize size, VkBufferUsageFlagBits usage,
   out_buffer->total_size = size;
   out_buffer->usage = usage;
   out_buffer->memory_property_flags = memory_property_flags;
+
+  out_buffer->freelist_memory_requirement = 0;
+  freelist_create(size, &out_buffer->freelist_memory_requirement, nullptr,
+                  nullptr);
+  out_buffer->freelist_block =
+      ns::alloc(out_buffer->freelist_memory_requirement, MemTag::RENDERER);
+  freelist_create(size, &out_buffer->freelist_memory_requirement,
+                  out_buffer->freelist_block, &out_buffer->buffer_freelist);
 
   VkBufferCreateInfo info{};
   info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -32,6 +48,7 @@ bool buffer_create(Context *context, usize size, VkBufferUsageFlagBits usage,
   if (out_buffer->memory_index == -1) {
     NS_ERROR("Unable to create vulkan buffer because required memory type "
              "index was not found.");
+    cleanup_freelist(out_buffer);
     return false;
   }
 
@@ -47,6 +64,7 @@ bool buffer_create(Context *context, usize size, VkBufferUsageFlagBits usage,
     NS_ERROR("Unable to create vulkan buffer because the required memory "
              "allocation failed. Error: %i",
              result);
+    cleanup_freelist(out_buffer);
     return false;
   }
 
@@ -58,6 +76,9 @@ bool buffer_create(Context *context, usize size, VkBufferUsageFlagBits usage,
 }
 
 void buffer_destroy(Context *context, Buffer *buffer) {
+  if (buffer->freelist_block) {
+    cleanup_freelist(buffer);
+  }
   if (buffer->memory) {
     vkFreeMemory(context->device, buffer->memory, context->allocator);
     buffer->memory = VK_NULL_HANDLE;
@@ -73,6 +94,27 @@ void buffer_destroy(Context *context, Buffer *buffer) {
 
 bool buffer_resize(Context *context, usize new_size, Buffer *buffer,
                    VkQueue queue, VkCommandPool pool) {
+  if (new_size < buffer->total_size) {
+    NS_ERROR("buffer_resize - new size must be greater than the current size");
+    return false;
+  }
+
+  u64 new_memory_requirement = 0;
+  freelist_resize(buffer->buffer_freelist, &new_memory_requirement, nullptr,
+                  new_size, nullptr);
+  ptr new_block = ns::alloc(new_memory_requirement, MemTag::RENDERER);
+  ptr old_block = nullptr;
+  if (!freelist_resize(buffer->buffer_freelist, &new_memory_requirement,
+                       new_block, new_size, &old_block)) {
+    NS_ERROR("buffer_resize - failed to resize the freelist");
+    ns::free(new_block, new_memory_requirement, MemTag::RENDERER);
+    return false;
+  }
+  ns::free(old_block, buffer->freelist_memory_requirement, MemTag::RENDERER);
+  buffer->freelist_memory_requirement = new_memory_requirement;
+  buffer->freelist_block = new_block;
+  buffer->total_size = new_size;
+
   VkBufferCreateInfo info{};
   info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   info.size = new_size;
@@ -140,6 +182,24 @@ ptr buffer_lock_memory(Context *context, Buffer *buffer, usize offset,
 
 void buffer_unlock_memory(Context *context, Buffer *buffer) {
   vkUnmapMemory(context->device, buffer->memory);
+}
+
+bool buffer_allocate(Buffer *buffer, u64 size, u64 *out_offset) {
+  if (!buffer || !size || !out_offset) {
+    NS_ERROR("buffer_allocate - invalid parameters");
+    return false;
+  }
+
+  return freelist_allocate_block(buffer->buffer_freelist, size, out_offset);
+}
+
+bool buffer_free(Buffer *buffer, u64 size, u64 offset) {
+  if (!buffer || !size) {
+    NS_ERROR("buffer_free - invalid parameters");
+    return false;
+  }
+
+  return freelist_free_block(buffer->buffer_freelist, size, offset);
 }
 
 void buffer_load_data(Context *context, Buffer *buffer, usize offset,

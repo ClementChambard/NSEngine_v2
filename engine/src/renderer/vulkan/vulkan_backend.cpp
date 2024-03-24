@@ -37,9 +37,13 @@ void create_command_buffers(renderer_backend *backend);
 void regenerate_framebuffers();
 bool recreate_swapchain(renderer_backend *backend);
 
-void upload_data_range(Context *context, VkCommandPool pool, VkFence fence,
-                       VkQueue queue, Buffer *buffer, usize offset, usize size,
-                       roptr data) {
+bool upload_data_range(Context *context, VkCommandPool pool, VkFence fence,
+                       VkQueue queue, Buffer *buffer, usize *out_offset,
+                       usize size, roptr data) {
+  if (!buffer_allocate(buffer, size, out_offset)) {
+    NS_ERROR("upload_data_range - failed to allocate from given buffer");
+    return false;
+  }
   VkBufferUsageFlags flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   Buffer staging;
@@ -47,11 +51,16 @@ void upload_data_range(Context *context, VkCommandPool pool, VkFence fence,
                 &staging);
   buffer_load_data(context, &staging, 0, size, 0, data);
   buffer_copy_to(context, pool, fence, queue, staging.handle, 0, buffer->handle,
-                 offset, size);
+                 *out_offset, size);
   buffer_destroy(context, &staging);
+  return true;
 }
 
-void free_data_range(Buffer * /*buffer*/, u64 /*offset*/, u64 /*size*/) {}
+void free_data_range(Buffer *buffer, u64 offset, u64 size) {
+  if (buffer) {
+    buffer_free(buffer, size, offset);
+  }
+}
 
 bool backend_initialize(renderer_backend *backend, cstr application_name) {
   context.find_memory_index = find_memory_index;
@@ -637,7 +646,6 @@ bool create_buffers(Context *context) {
     NS_ERROR("Error creating vertex buffer.");
     return false;
   }
-  context->geometry_vertex_offset = 0;
 
   const usize index_buffer_size = sizeof(u32) * 1024 * 1024;
   if (!buffer_create(
@@ -649,7 +657,6 @@ bool create_buffers(Context *context) {
     NS_ERROR("Error creating index buffer.");
     return false;
   }
-  context->geometry_index_offset = 0;
 
   return true;
 }
@@ -840,22 +847,27 @@ bool backend_create_geometry(Geometry *geometry, u32 vertex_size,
   VkCommandPool pool = context.device.graphics_command_pool;
   VkQueue queue = context.device.graphics_queue;
 
-  internal_data->vertex_buffer_offset = context.geometry_vertex_offset;
   internal_data->vertex_count = vertex_count;
   internal_data->vertex_element_size = vertex_size;
   u32 total_size = vertex_size * vertex_count;
-  upload_data_range(&context, pool, 0, queue, &context.object_vertex_buffer,
-                    internal_data->vertex_buffer_offset, total_size, vertices);
-  context.geometry_vertex_offset += total_size;
+  if (!upload_data_range(
+          &context, pool, 0, queue, &context.object_vertex_buffer,
+          &internal_data->vertex_buffer_offset, total_size, vertices)) {
+    NS_ERROR("vulkan::renderer_create_geometry - failed to upload vertex data");
+    return false;
+  }
 
   if (index_count && indices) {
-    internal_data->index_buffer_offset = context.geometry_index_offset;
     internal_data->index_count = index_count;
     internal_data->index_element_size = index_size;
     total_size = index_size * index_count;
-    upload_data_range(&context, pool, 0, queue, &context.object_index_buffer,
-                      internal_data->index_buffer_offset, total_size, indices);
-    context.geometry_index_offset += total_size;
+    if (!upload_data_range(
+            &context, pool, 0, queue, &context.object_index_buffer,
+            &internal_data->index_buffer_offset, total_size, indices)) {
+      NS_ERROR(
+          "vulkan::renderer_create_geometry - failed to upload index data");
+      return false;
+    }
   }
 
   if (internal_data->generation == INVALID_ID) {

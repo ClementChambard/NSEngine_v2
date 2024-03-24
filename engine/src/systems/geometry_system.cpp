@@ -286,6 +286,9 @@ bool create_default_geometries(geometry_system_state *state) {
 
   u32 indices[6] = {0, 1, 2, 0, 3, 1};
 
+  state->default_geometry.id = INVALID_ID;
+  state->default_geometry.generation = INVALID_ID;
+  state->default_geometry.internal_id = INVALID_ID;
   if (!renderer_create_geometry(&state->default_geometry, sizeof(vertex_3d), 4,
                                 verts, sizeof(u32), 6, indices)) {
     NS_FATAL("Failed to create default geometry.");
