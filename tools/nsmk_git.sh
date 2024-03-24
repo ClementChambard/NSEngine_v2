@@ -1,7 +1,7 @@
 GIT_DIR=$NSMK_PATH/..
 GIT_PUSH_ALL_TARGETS="engine assets testbed tests tools CMakeLists.txt README.md"
 
-push_all() {
+nsmk_cmd_git_push_all() {
   echo "git add $GIT_PUSH_ALL_TARGETS" &&
   git add $GIT_PUSH_ALL_TARGETS &&
   echo "git commit -m \"$1\"" &&
@@ -11,7 +11,7 @@ push_all() {
   return $?
 }
 
-git_cmd() {
+nsmk_cmd_git() {
   cd $GIT_DIR
   if [ $# -lt 1 ]; then
     echo "Usage: nsmk git <command> ..."
@@ -23,7 +23,7 @@ git_cmd() {
       echo "Usage: nsmk git pushall <commit_message>"
       return 1
     fi
-    push_all "$2"
+    nsmk_cmd_git_push_all "$2"
     return $?
   else
     echo "invalid command: $1"
